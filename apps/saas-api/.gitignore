@@ -1,0 +1,10 @@
+# Logs
+logs/
+*.log
+
+# Database
+*.sql.backup
+
+# Environment
+.env
+.env.local

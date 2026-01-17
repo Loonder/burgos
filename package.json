@@ -1,0 +1,29 @@
+{
+  "name": "burgos-experience-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Experiência Premium para Barbearia Burgos",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "cd packages/database && npm run migrate",
+    "db:seed": "cd packages/database && npm run seed"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.53.0",
+    "@typescript-eslint/parser": "^8.53.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0",
+    "turbo": "^1.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "@burgos/database",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "migrate": "node scripts/migrate.js",
+        "seed": "node scripts/seed.js"
+    },
+    "dependencies": {
+        "pg": "^8.13.1",
+        "dotenv": "^16.4.7"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.11.10"
+    }
+}

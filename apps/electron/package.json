@@ -1,0 +1,36 @@
+{
+    "name": "burgos-electron",
+    "version": "1.0.0",
+    "main": "dist/main.js",
+    "scripts": {
+        "dev": "tsc && wait-on http://localhost:3000/reception && electron .",
+        "build": "tsc && electron-builder",
+        "start": "tsc && electron ."
+    },
+    "keywords": [],
+    "description": "Burgos Reception App",
+    "author": "Burgos Barber",
+    "license": "ISC",
+    "devDependencies": {
+        "electron": "^28.3.3",
+        "electron-builder": "^24.9.1",
+        "typescript": "^5.3.3",
+        "wait-on": "^7.2.0"
+    },
+    "build": {
+        "appId": "com.burgos.reception",
+        "productName": "Burgos Reception",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "dist/**/*",
+            "package.json"
+        ],
+        "win": {
+            "target": "portable",
+            "verifyUpdateCodeSignature": false,
+            "forceCodeSigning": false
+        }
+    }
+}
