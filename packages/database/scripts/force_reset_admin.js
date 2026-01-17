@@ -9,8 +9,14 @@ async function reset() {
     await client.connect();
 
     try {
-        const email = 'admin@burgos.com';
-        const password = 'admin';
+        const email = process.env.ADMIN_EMAIL || 'admin@burgos.com';
+        const password = process.env.ADMIN_PASSWORD;
+
+        if (!password) {
+            console.error('❌ Error: ADMIN_PASSWORD is required in .env');
+            process.exit(1);
+        }
+
         const hash = await bcrypt.hash(password, 10);
 
         // 1. Get Tenant
@@ -42,7 +48,6 @@ async function reset() {
         }
         console.log('✅ Admin reset successfully.');
         console.log(`Email: ${email}`);
-        console.log(`Password: ${password}`);
 
     } catch (e) {
         console.error('Error:', e);

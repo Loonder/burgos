@@ -19,7 +19,13 @@ const barbers = [
 async function seedBarbers() {
     await client.connect();
     try {
-        const passwordHash = await bcrypt.hash('burgos123', 10);
+        const barberPassword = process.env.BARBER_PASSWORD;
+        if (!barberPassword) {
+            console.error('❌ Error: BARBER_PASSWORD is required in .env');
+            process.exit(1);
+        }
+
+        const passwordHash = await bcrypt.hash(barberPassword, 10);
 
         for (const barber of barbers) {
             const check = await client.query("SELECT id FROM users WHERE name = $1 AND role = 'barbeiro'", [barber.name]);

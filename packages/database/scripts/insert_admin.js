@@ -13,8 +13,14 @@ async function main() {
         await client.connect();
         console.log('🔌 Connected to DB');
 
-        const email = 'admin@burgos.com';
-        const rawPassword = 'admin'; // Simple password for now
+        const email = process.env.ADMIN_EMAIL || 'admin@burgos.com';
+        const rawPassword = process.env.ADMIN_PASSWORD;
+
+        if (!rawPassword) {
+            console.error('❌ Error: ADMIN_PASSWORD is required in .env');
+            process.exit(1);
+        }
+
         const passwordHash = await bcrypt.hash(rawPassword, 10);
 
         // Check if admin exists
@@ -32,7 +38,7 @@ async function main() {
             );
         }
 
-        console.log(`✅ Admin configured: ${email} / ${rawPassword}`);
+        console.log(`✅ Admin configured: ${email}`);
 
     } catch (err) {
         console.error('Error:', err);

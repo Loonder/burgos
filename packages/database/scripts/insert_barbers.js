@@ -23,7 +23,13 @@ async function main() {
         await client.connect();
         console.log('🔌 Connected to DB');
 
-        const passwordHash = await bcrypt.hash('burgos123', 10);
+        const barberPassword = process.env.BARBER_PASSWORD;
+        if (!barberPassword) {
+            console.error('❌ Error: BARBER_PASSWORD is required in .env');
+            process.exit(1);
+        }
+
+        const passwordHash = await bcrypt.hash(barberPassword, 10);
 
         for (const barber of BARBERS) {
             const email = `${barber.name.toLowerCase()}@burgos.com`;
@@ -45,7 +51,7 @@ async function main() {
                     [barber.id, barber.name, email, passwordHash, 'barbeiro', '000000000']
                 );
             }
-            console.log(`✅ Configured: ${email} / burgos123`);
+            console.log(`✅ Configured: ${email}`);
         }
 
     } catch (err) {

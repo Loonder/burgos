@@ -16,8 +16,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function seedAdmin() {
     console.log('Seeding Admin User...');
 
-    const email = 'admin@burgos.com';
-    const password = 'admin';
+    const email = process.env.ADMIN_EMAIL || 'admin@burgos.com';
+    const password = process.env.ADMIN_PASSWORD;
+
+    if (!password) {
+        console.error('❌ Error: ADMIN_PASSWORD is required in .env');
+        process.exit(1);
+    }
     const name = 'Administrador Burgos';
     const role = 'admin';
 
