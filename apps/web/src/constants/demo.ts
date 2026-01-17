@@ -1,1 +1,0 @@
-export const DEMO_CLIENT_ID = '2f246e7b-80e3-4fc2-b062-094154941914';

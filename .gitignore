@@ -62,6 +62,7 @@ Thumbs.db
 *.pem
 *.crt
 *.cert
+*.md
 
 # DB dumps
 *.sql
@@ -71,3 +72,5 @@ Thumbs.db
 # Local sensitive files
 db_ids.txt
 real_db_ids.txt
+# Excluded Apps
+apps/web/
