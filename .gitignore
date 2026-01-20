@@ -63,6 +63,7 @@ Thumbs.db
 *.crt
 *.cert
 *.md
+!README.md
 
 # DB dumps
 *.sql
