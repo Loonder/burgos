@@ -20,7 +20,11 @@ async function main() {
             return;
         }
 
-        const defaultPass = 'burgos123';
+        const defaultPass = process.env.BARBER_PASSWORD;
+        if (!defaultPass) {
+            console.error('❌ BARBER_PASSWORD not set in .env');
+            process.exit(1);
+        }
         const defaultHash = await bcrypt.hash(defaultPass, 10);
 
         for (const user of res.rows) {

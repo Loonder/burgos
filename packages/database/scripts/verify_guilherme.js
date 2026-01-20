@@ -29,12 +29,13 @@ async function main() {
         console.log(`👤 User Found: ${user.email}`);
 
         // Verify Password
-        const match = await bcrypt.compare('burgos123', user.password_hash);
-        console.log(`🔐 Password 'burgos123' matches? ${match ? 'YES ✅' : 'NO ❌'}`);
+        const testPassword = process.env.BARBER_PASSWORD || 'test';
+        const match = await bcrypt.compare(testPassword, user.password_hash);
+        console.log(`🔐 Password matches? ${match ? 'YES ✅' : 'NO ❌'}`);
 
-        if (!match) {
-            console.log("Resetting password to 'burgos123'...");
-            const newHash = await bcrypt.hash('burgos123', 10);
+        if (!match && process.env.BARBER_PASSWORD) {
+            console.log("Resetting password...");
+            const newHash = await bcrypt.hash(process.env.BARBER_PASSWORD, 10);
             await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
             console.log("✅ Password reset.");
         }

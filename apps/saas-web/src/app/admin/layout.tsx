@@ -1,14 +1,15 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, Scissors, Settings, LogOut, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, Scissors, Settings, LogOut, Calendar, Menu, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { user, isLoading, logout } = useAuth();
     const router = useRouter();
+    const [isSidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         // If not loading and not authenticated, redirect to login
@@ -17,6 +18,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             router.push('/admin/login');
         }
     }, [isLoading, user, pathname, router]);
+
+    // Close sidebar on route change (mobile)
+    useEffect(() => {
+        setSidebarOpen(false);
+    }, [pathname]);
 
     // If on login page, just render children (the login form)
     if (pathname === '/admin/login') {
@@ -33,22 +39,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Profissionais', href: '/admin/barbers', icon: Users },
         { name: 'Serviços', href: '/admin/services', icon: Scissors },
         { name: 'Configurações', href: '/admin/settings', icon: Settings },
-        { name: 'Baixar App', href: '/downloads/Burgos Reception 1.0.0.exe', icon: Calendar }, // Using Calendar icon as placeholder or download if available
+        { name: 'Baixar App', href: '/downloads/Burgos Reception 1.0.0.exe', icon: Calendar }, // Using Calendar icon as placeholder
     ];
 
     return (
-        <div className="min-h-screen bg-burgos-dark flex">
+        <div className="min-h-screen bg-burgos-dark flex relative">
+            {/* Mobile Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-black/40 border-r border-white/5 flex flex-col">
-                <div className="p-8">
+            <aside
+                className={`
+                    w-64 bg-black/90 md:bg-black/40 border-r border-white/5 flex flex-col 
+                    fixed md:static inset-y-0 left-0 z-50 
+                    transition-transform duration-300 ease-in-out
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}
+            >
+                <div className="p-8 flex items-center justify-between">
                     <h1 className="text-2xl font-display font-bold text-burgos-primary">
                         Burgos<span className="text-white">Admin</span>
                     </h1>
+                    <button onClick={() => setSidebarOpen(false)} className="md:hidden text-white">
+                        <X size={24} />
+                    </button>
                 </div>
 
-                <nav className="flex-1 px-4 space-y-2">
+                <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
                     {menu.map((item) => {
-                        const isActive = pathname === item.href;
+                        const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
                         return (
                             <Link
                                 key={item.href}
@@ -83,22 +107,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-auto">
-                <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/20 backdrop-blur-sm sticky top-0 z-10">
-                    <h2 className="text-xl font-bold text-white">
-                        {menu.find(i => i.href === pathname)?.name || 'Dashboard'}
-                    </h2>
+            <main className="flex-1 overflow-auto flex flex-col min-w-0">
+                <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-black/20 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setSidebarOpen(true)}
+                            className="text-white md:hidden p-2 hover:bg-white/5 rounded-lg"
+                        >
+                            <Menu size={24} />
+                        </button>
+                        <h2 className="text-xl font-bold text-white truncate">
+                            {menu.find(i => i.href === pathname)?.name || 'Dashboard'}
+                        </h2>
+                    </div>
+
                     <div className="flex items-center gap-4">
                         <div className="text-right hidden md:block">
                             <p className="text-white font-bold text-sm">{user.name}</p>
                             <p className="text-burgos-text text-xs uppercase">{user.role}</p>
                         </div>
-                        <div className="h-10 w-10 rounded-full bg-burgos-primary flex items-center justify-center text-burgos-dark font-bold text-lg">
+                        <div className="h-10 w-10 rounded-full bg-burgos-primary flex items-center justify-center text-burgos-dark font-bold text-lg shrink-0">
                             {user.name.charAt(0)}
                         </div>
                     </div>
                 </header>
-                <div className="p-8">
+                <div className="p-4 md:p-8 flex-1">
                     {children}
                 </div>
             </main>

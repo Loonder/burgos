@@ -28,8 +28,9 @@ async function main() {
         console.log(`   Role: ${user.role}`);
 
         // Verify Password
-        const match = await bcrypt.compare('burgos123', user.password_hash);
-        console.log(`🔐 Password 'burgos123' matches? ${match ? 'YES ✅' : 'NO ❌'}`);
+        const testPassword = process.env.BARBER_PASSWORD || 'test';
+        const match = await bcrypt.compare(testPassword, user.password_hash);
+        console.log(`🔐 Password matches? ${match ? 'YES ✅' : 'NO ❌'}`);
 
     } catch (err) {
         console.error('Error:', err);
