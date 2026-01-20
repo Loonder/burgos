@@ -73,7 +73,6 @@ Thumbs.db
 # Local sensitive files
 db_ids.txt
 real_db_ids.txt
-# Excluded Apps
-apps/web/
+# Excluded Apps (SaaS whitelabel only)
 apps/saas-web/
 apps/saas-api/
