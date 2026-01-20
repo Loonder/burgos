@@ -74,3 +74,5 @@ db_ids.txt
 real_db_ids.txt
 # Excluded Apps
 apps/web/
+apps/saas-web/
+apps/saas-api/
