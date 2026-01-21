@@ -69,21 +69,26 @@ export function LandingFooter() {
                                     <MapPin size={14} />
                                 </div>
                                 <span>
-                                    Av. Dr. José Maciel, 500<br />
-                                    Jardim Maria Rosa<br />
+                                    Praça Miguel Ortega, 36<br />
+                                    Parque Assunção<br />
                                     Taboão da Serra - SP
                                 </span>
                             </li>
-                            <li className="pt-2">
-                                <a
-                                    href="https://maps.google.com"
-                                    target="_blank"
-                                    className="text-xs font-bold uppercase tracking-wider text-burgos-primary hover:text-white border-b border-burgos-primary pb-0.5"
-                                >
-                                    Abrir no Mapa
-                                </a>
-                            </li>
+
                         </ul>
+                        {/* Google Maps Embed */}
+                        <div className="mt-4 rounded-lg overflow-hidden border border-white/10">
+                            <iframe
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3655.9752460688915!2d-46.7620062!3d-23.605220699999997!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94ce543bd8d21343%3A0x6ef42e19f2bffbcb!2sPra%C3%A7a%20Miguel%20Ortega%2C%2036%20-%20Parque%20Assuncao%2C%20Tabo%C3%A3o%20da%20Serra%20-%20SP%2C%2006754-160!5e0!3m2!1spt-BR!2sbr!4v1769027748153!5m2!1spt-BR!2sbr"
+                                width="100%"
+                                height="180"
+                                style={{ border: 0 }}
+                                allowFullScreen
+                                loading="lazy"
+                                referrerPolicy="no-referrer-when-downgrade"
+                                className="grayscale hover:grayscale-0 transition-all duration-500"
+                            />
+                        </div>
                     </div>
 
                     {/* Hours */}
