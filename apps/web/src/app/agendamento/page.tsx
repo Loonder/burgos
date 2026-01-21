@@ -14,7 +14,7 @@ import { ServiceCard } from '@/components/booking/ServiceCard';
 import { ProductSelection } from '@/components/booking/ProductSelection';
 import { ServiceCardSkeleton } from '@/components/skeletons/ServiceCardSkeleton';
 import { toast } from 'sonner';
-
+import confetti from 'canvas-confetti';
 
 
 
@@ -54,6 +54,9 @@ export default function BookingPage() {
     const [clients, setClients] = useState<any[]>([]);
     const [selectedClient, setSelectedClient] = useState<string>('');
     const [loadingClients, setLoadingClients] = useState(false);
+
+    // Booking Loading State
+    const [loadingBooking, setLoadingBooking] = useState(false);
 
     // Selection states
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -103,8 +106,8 @@ export default function BookingPage() {
             setProductsPrice(parsed.productsPrice || 0);
             setStep(parsed.step); // Restore to the last step
 
-            // Clean up
-            localStorage.removeItem('booking_state');
+            // Do NOT remove immediatey. Let it persist until success or manual clear.
+            // This prevents issues with React Strict Mode (double mount) or page refreshes.
         }
     }, []);
 
@@ -112,7 +115,9 @@ export default function BookingPage() {
     useEffect(() => {
         const fetchServices = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/services`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/services`, {
+                    credentials: 'include'
+                });
                 const data = await res.json();
                 setServices(data.data);
             } catch (error) {
@@ -124,7 +129,9 @@ export default function BookingPage() {
 
         const fetchBarbers = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/barbers`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/barbers`, {
+                    credentials: 'include'
+                });
                 const data = await res.json();
                 setBarbers(data.data || []);
             } catch (error) {
@@ -181,7 +188,7 @@ export default function BookingPage() {
             setLoadingClients(true);
             try {
                 const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/clients`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                    credentials: 'include' // Use cookies instead of localStorage
                 });
                 const data = await res.json();
                 setClients(data.data || []);
@@ -235,12 +242,19 @@ export default function BookingPage() {
             const dateStr = date.toISOString().split('T')[0];
             const url = `${process.env.NEXT_PUBLIC_API_URL}/api/barbers/${selectedBarber}/available-slots`;
 
+            console.log('Fetching slots for date:', dateStr);
             const { data } = await api.get(url, {
                 params: {
                     date: dateStr,
                     serviceIds: selectedServices.join(',')
+                },
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
                 }
             });
+            console.log('Slots received:', data.slots);
             setAvailableSlots(data.slots || []);
         } catch (error) {
             console.error('Error fetching slots:', error);
@@ -290,6 +304,7 @@ export default function BookingPage() {
     };
 
     const handleFinalize = async (preferences: any) => {
+        setLoadingBooking(true);
         try {
             const appointmentData = {
                 serviceIds: selectedServices,
@@ -304,12 +319,34 @@ export default function BookingPage() {
 
             const response = await api.post('/api/appointments', appointmentData);
 
-            // Success is implied if no error thrown
-            // const data = response.data; // if needed
+            // Confetti Effect
+            const duration = 3000;
+            const end = Date.now() + duration;
 
+            const frame = () => {
+                // Barber Pole Colors: Red, White, Blue (and Gold for luxury)
+                const colors = ['#dc2626', '#ffffff', '#2563eb', '#FF9F1C'];
 
+                confetti({
+                    particleCount: 3,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: colors
+                });
+                confetti({
+                    particleCount: 3,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: colors
+                });
 
-            // ...
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            };
+            frame();
 
             // Success: Move to Success View
             setStep(7); // Success is now Step 7
@@ -317,7 +354,15 @@ export default function BookingPage() {
             toast.success('Agendamento realizado com sucesso!');
         } catch (error: any) {
             console.error('Error booking:', error);
-            toast.error(error.message || 'Erro ao realizar agendamento');
+            // Handle specific error codes
+            if (error.response?.status === 409) {
+                toast.error('Este horário já foi reservado. Por favor, escolha outro horário.');
+                setStep(3); // Go back to time selection
+            } else {
+                toast.error(error.response?.data?.error || error.message || 'Erro ao realizar agendamento');
+            }
+        } finally {
+            setLoadingBooking(false);
         }
     };
 
@@ -336,7 +381,9 @@ export default function BookingPage() {
                 try {
                     // Start of Selection
                     if (user?.id) {
-                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/preferences/${user.id}`);
+                        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/preferences/${user.id}`, {
+                            credentials: 'include'
+                        });
                         const data = await res.json();
                         if (data.preferences) {
                             setInitialPreferences(data.preferences);
@@ -584,6 +631,7 @@ export default function BookingPage() {
                             onConfirm={handleConfirm}
                             productsPrice={productsPrice}
                             productsCount={selectedProducts.length}
+                            isLoading={loadingBooking}
                         />
                     </div>
                 )}

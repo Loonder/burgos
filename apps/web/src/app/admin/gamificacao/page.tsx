@@ -47,22 +47,22 @@ export default function GamificationPage() {
     };
 
     return (
-        <div className="p-8 pb-32 max-w-5xl mx-auto">
-            <div className="text-center mb-10">
-                <h1 className="text-4xl font-display font-bold text-white mb-2 flex items-center justify-center gap-3">
-                    <Trophy className="text-yellow-400" size={40} /> Ranking de Barbeiros
+        <div className="px-4 lg:p-8 pb-32 max-w-5xl mx-auto">
+            <div className="text-center mb-6 lg:mb-10">
+                <h1 className="text-2xl lg:text-4xl font-display font-bold text-white mb-2 flex items-center justify-center gap-2 lg:gap-3">
+                    <Trophy className="text-yellow-400 w-7 h-7 lg:w-10 lg:h-10" /> Ranking de Barbeiros
                 </h1>
-                <p className="text-burgos-accent/60">Quem são os lendas da tesoura?</p>
+                <p className="text-burgos-accent/60 text-sm lg:text-base">Quem são os lendas da tesoura?</p>
             </div>
 
-            <div className="flex justify-center gap-2 mb-8 bg-burgos-secondary/30 p-1 rounded-xl w-fit mx-auto border border-white/5">
+            <div className="flex justify-center gap-1 lg:gap-2 mb-6 lg:mb-8 bg-burgos-secondary/30 p-1 rounded-xl w-fit mx-auto border border-white/5">
                 {['week', 'month', 'all'].map((p) => (
                     <button
                         key={p}
                         onClick={() => setPeriod(p)}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-all capitalize ${period === p
-                                ? 'bg-burgos-primary text-white shadow-lg'
-                                : 'text-burgos-accent/50 hover:text-white hover:bg-white/5'
+                        className={`px-3 lg:px-6 py-2 rounded-lg text-xs lg:text-sm font-bold transition-all capitalize ${period === p
+                            ? 'bg-burgos-primary text-white shadow-lg'
+                            : 'text-burgos-accent/50 hover:text-white hover:bg-white/5'
                             }`}
                     >
                         {p === 'week' ? 'Semana' : p === 'month' ? 'Mês' : 'Geral'}
@@ -78,22 +78,22 @@ export default function GamificationPage() {
                 ) : (
                     <div className="divide-y divide-white/5">
                         {leaderboard.map((barber, index) => (
-                            <div key={barber.barber_id} className={`p-6 flex items-center gap-6 transition-colors ${index === 0 ? 'bg-gradient-to-r from-yellow-500/10 to-transparent' : 'hover:bg-white/5'
+                            <div key={barber.barber_id} className={`p-4 lg:p-6 flex items-center gap-3 lg:gap-6 transition-colors ${index === 0 ? 'bg-gradient-to-r from-yellow-500/10 to-transparent' : 'hover:bg-white/5'
                                 }`}>
-                                <div className="w-12 h-12 flex items-center justify-center shrink-0">
+                                <div className="w-8 h-8 lg:w-12 lg:h-12 flex items-center justify-center shrink-0">
                                     {getRankIcon(index + 1)}
                                 </div>
 
-                                <div className="flex items-center gap-4 flex-1">
-                                    <div className="w-12 h-12 rounded-full bg-burgos-dark border-2 border-white/10 overflow-hidden relative">
+                                <div className="flex items-center gap-3 lg:gap-4 flex-1 min-w-0">
+                                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-burgos-dark border-2 border-white/10 overflow-hidden relative flex-shrink-0">
                                         {barber.avatar_url ? (
                                             <img src={barber.avatar_url} alt={barber.name} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold text-burgos-accent/30 tracking-widest">IMG</div>
                                         )}
                                     </div>
-                                    <div>
-                                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm lg:text-lg font-bold text-white flex items-center gap-2 truncate">
                                             {barber.name}
                                             {index === 0 && <span className="bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Líder</span>}
                                         </h3>
@@ -110,9 +110,9 @@ export default function GamificationPage() {
                                     </div>
                                 </div>
 
-                                <div className="text-right">
-                                    <p className="text-xs text-burgos-accent/40 uppercase tracking-widest mb-1">Score</p>
-                                    <p className="text-2xl font-bold text-white font-mono">{barber.score}</p>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-[10px] lg:text-xs text-burgos-accent/40 uppercase tracking-widest mb-0.5 lg:mb-1">Score</p>
+                                    <p className="text-lg lg:text-2xl font-bold text-white font-mono">{barber.score}</p>
                                 </div>
                             </div>
                         ))}
@@ -120,7 +120,7 @@ export default function GamificationPage() {
                 )}
             </div>
 
-            <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="mt-8 lg:mt-12 grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
                 <BadgeCard icon={<Flame size={20} />} title="Semana de Fogo" desc="7 dias seguidos" />
                 <BadgeCard icon={<Star size={20} />} title="5 Estrelas" desc="Avaliação 4.8+" />
                 <BadgeCard icon={<Crown size={20} />} title="Rei da Tesoura" desc="Top 1 do Mês" />
@@ -132,13 +132,13 @@ export default function GamificationPage() {
 
 function BadgeCard({ icon, title, desc }: any) {
     return (
-        <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center gap-4 opacity-50 grayscale hover:grayscale-0 hover:opacity-100 hover:bg-white/10 transition-all cursor-help" title="Conquista Bloqueada">
+        <div className="bg-white/5 p-3 lg:p-4 rounded-xl border border-white/5 flex items-center gap-2 lg:gap-4 opacity-50 grayscale hover:grayscale-0 hover:opacity-100 hover:bg-white/10 transition-all cursor-help" title="Conquista Bloqueada">
             <div className="p-2 bg-burgos-dark rounded-lg text-burgos-primary shadow-inner">
                 {icon}
             </div>
-            <div>
-                <h4 className="font-bold text-white text-sm">{title}</h4>
-                <p className="text-burgos-accent/40 text-xs">{desc}</p>
+            <div className="min-w-0">
+                <h4 className="font-bold text-white text-xs lg:text-sm truncate">{title}</h4>
+                <p className="text-burgos-accent/40 text-[10px] lg:text-xs truncate">{desc}</p>
             </div>
         </div>
     );

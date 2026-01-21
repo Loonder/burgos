@@ -11,11 +11,15 @@ export class BarberController {
             const { date, serviceId, serviceIds } = req.query;
 
             if (!date || (!serviceId && !serviceIds)) {
-                return res.status(400).json({ error: 'Missing date or serviceId(s)' });
+                logger.warn(`Missing date or serviceId(s). Query: ${JSON.stringify(req.query)}`);
+                return res.status(400).json({ error: '[DEBUG] Missing date or serviceId(s)' });
             }
 
             const dateStr = date as string;
             const requestedDate = new Date(dateStr);
+            if (isNaN(requestedDate.getTime())) {
+                return res.status(400).json({ error: 'Invalid date format' });
+            }
             const dayOfWeek = requestedDate.getUTCDay();
 
             // 1. Get Schedule
@@ -27,36 +31,63 @@ export class BarberController {
                 .single();
 
             if (scheduleError || !schedule) {
+                // Not an error, just no slots (barber not working)
                 return res.status(200).json({ slots: [] });
             }
 
             // 2. Get Service Duration(s)
             let duration = 0;
-            const idsToCheck = serviceIds
-                ? (serviceIds as string).split(',')
-                : [serviceId as string];
+            let idsToCheck: string[] = [];
+
+            if (serviceIds) {
+                const sIds = serviceIds as string; // Handle potential array if needed? Usually string in Express query
+                idsToCheck = sIds.includes(',') ? sIds.split(',') : [sIds];
+            } else if (serviceId) {
+                idsToCheck = [serviceId as string];
+            }
 
             const { data: services, error: serviceError } = await supabase
                 .from('services')
-                .select('duration_minutes')
+                .select('id, duration_minutes') // Select ID too for verification
                 .in('id', idsToCheck);
 
             if (serviceError || !services || services.length === 0) {
-                return res.status(400).json({ error: 'Services not found' });
+                logger.warn(`Services not found for IDs: ${idsToCheck.join(', ')}`);
+                return res.status(400).json({ error: `Services not found: ${idsToCheck.join(', ')}` });
+            }
+
+            // Check if ALL requested services exist
+            if (services.length !== idsToCheck.length) {
+                const foundIds = services.map(s => s.id);
+                const missingIds = idsToCheck.filter(id => !foundIds.includes(id));
+                logger.warn(`Some services not found: ${missingIds.join(', ')}`);
+                // Proceed with found ones? Or error? Strict mode: Error.
+                return res.status(400).json({ error: `Some services not found: ${missingIds.join(', ')}` });
             }
 
             // Sum duration of all selected services
             duration = services.reduce((acc, curr) => acc + curr.duration_minutes, 0);
 
             // 3. Get Existing Appointments
+            // Widen range to handle timezone boundaries safely (Yesterday/Today/Tomorrow relative to UTC)
+            // requestedDate is UTC Midnight of the requested day
+            const searchStart = new Date(requestedDate);
+            searchStart.setDate(searchStart.getDate() - 1); // Look back 1 day
+            const searchEnd = new Date(requestedDate);
+            searchEnd.setDate(searchEnd.getDate() + 2); // Look forward 2 days (total 3 days coverage)
+
+            // Simplification: Just take the whole window around the date to be safe
             const { data: appointments, error: apptError } = await supabase
                 .from('appointments')
                 .select('scheduled_at, duration_minutes')
                 .eq('barber_id', id)
-                .eq('scheduled_at::date', dateStr)
+                .gte('scheduled_at', searchStart.toISOString())
+                .lte('scheduled_at', searchEnd.toISOString())
                 .neq('status', 'cancelado');
 
             if (apptError) throw apptError;
+
+            logger.info(`Fetching slots for ${dateStr}. Found ${appointments?.length} appointments.`);
 
             // 4. Generate All Slots
             const slots: string[] = [];
@@ -71,37 +102,28 @@ export class BarberController {
 
             // Slot interval (e.g., 30 mins)
             const SLOT_INTERVAL = 30;
-            const APPOINTMENT_BUFFER_MIN = 2; // Buffer after every appointment
+            const APPOINTMENT_BUFFER_MIN = 0; // Buffer REMOVED to prevent overlap
+            const BUFFER_MS = APPOINTMENT_BUFFER_MIN * 60 * 1000;
+
+            // Base Date for Slots (Strict BRT -03:00)
+            const baseDateInfo = new Date(`${dateStr}T00:00:00-03:00`);
+            const baseEpoch = baseDateInfo.getTime();
 
             for (let current = startTotal; current + duration <= endTotal; current += SLOT_INTERVAL) {
-                const slotStartMin = current;
-                const slotEndMin = current + duration;
-
-                // Effective end for blocking purposes (includes buffer)
-                const slotEndWithBuffer = slotEndMin + APPOINTMENT_BUFFER_MIN;
+                // Calculated Slot Times in Epoch (Absolute Time)
+                // current is minutes from midnight BRT
+                const slotStartMs = baseEpoch + (current * 60 * 1000);
+                const slotEndMs = slotStartMs + (duration * 60 * 1000);
+                const slotEndWithBuffer = slotEndMs + BUFFER_MS;
 
                 // Check if overlaps with any appointment
                 const isBlocked = appointments?.some(appt => {
-                    const apptDate = new Date(appt.scheduled_at);
-                    // Adjust to minutes
-                    const apptStart = apptDate.getUTCHours() * 60 + apptDate.getUTCMinutes();
-                    const apptEnd = apptStart + appt.duration_minutes;
-                    const apptEndWithBuffer = apptEnd + APPOINTMENT_BUFFER_MIN;
+                    const apptStartMs = new Date(appt.scheduled_at).getTime();
+                    const apptEndMs = apptStartMs + (appt.duration_minutes * 60 * 1000);
+                    const apptEndWithBuffer = apptEndMs + BUFFER_MS;
 
-                    // Overlap logic: 
-                    // 1. Candidate Slot overlaps Existing Appointment (considering Existing's buffer)
-                    // 2. Existing Appointment overlaps Candidate Slot (considering Candidate's buffer)
-                    // Formula: (StartA < EndB) && (EndA > StartB)
-
-                    // We check if "Slot (extended)" overlaps "Appt" OR "Slot" overlaps "Appt (extended)"
-                    // Actually simplier: Treat BOTH as having extended duration for the check?
-                    // If A finishes at 10:00 (10:02 buffered), B starts at 10:00. 
-                    // B.Start (10:00) < A.EndBuffer (10:02) -> Overlap! Correct.
-
-                    // If B finishes at 10:00 (10:02 buffered), A starts at 10:00.
-                    // B.EndBuffer (10:02) > A.Start (10:00) -> Overlap! Correct.
-
-                    return (slotStartMin < apptEndWithBuffer) && (slotEndWithBuffer > apptStart);
+                    // Overlap: (StartA < EndB) && (EndA > StartB)
+                    return (slotStartMs < apptEndWithBuffer) && (slotEndWithBuffer > apptStartMs);
                 });
 
                 if (!isBlocked) {
@@ -111,6 +133,17 @@ export class BarberController {
                     slots.push(`${h}:${m}`);
                 }
             }
+
+            logger.info(`Available slots for barber ${id} on ${dateStr}:`, {
+                totalSlots: slots.length,
+                existingAppointments: appointments?.length || 0,
+                appointmentsDetail: appointments?.map(a => ({
+                    scheduled_at: a.scheduled_at,
+                    localTime: new Date(a.scheduled_at).toLocaleTimeString('pt-BR'),
+                    duration: a.duration_minutes
+                })),
+                slotsReturned: slots.slice(0, 5) // First 5 slots for debug
+            });
 
             res.status(200).json({ slots });
         } catch (error: any) {

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppointmentCardSkeleton } from '@/components/skeletons/AppointmentCardSkeleton';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
+import axios from 'axios';
 
 interface Appointment {
     id: string;
@@ -36,12 +38,13 @@ export default function MyAppointments() {
 
         const fetchAppointments = async () => {
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments?clientId=${user.id}`);
-                if (!response.ok) throw new Error('Failed to fetch');
-                const data = await response.json();
+                const { data } = await api.get(`/api/appointments?clientId=${user.id}`);
                 setAppointments(data.data || []);
             } catch (error) {
                 console.error(error);
+                if (axios.isAxiosError(error) && error.response?.status === 401) {
+                    // Optional: handle token expiration
+                }
             } finally {
                 setLoading(false);
             }
@@ -61,6 +64,7 @@ export default function MyAppointments() {
         try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/${id}`, {
                 method: 'DELETE',
+                credentials: 'include', // Important: Include cookies for auth
             });
 
             if (!response.ok) throw new Error('Falha ao cancelar');
@@ -86,7 +90,15 @@ export default function MyAppointments() {
                         ← Voltar
                     </button>
                     <h1 className="text-xl font-display font-bold text-white">Meus Agendamentos</h1>
-                    <div className="w-8"></div> {/* Spacer */}
+                    <button
+                        onClick={() => router.push('/agendamento')}
+                        className="bg-burgos-primary/10 text-burgos-primary hover:bg-burgos-primary/20 p-2 rounded-full transition-colors"
+                        title="Novo Agendamento"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
                 </div>
             </div>
 

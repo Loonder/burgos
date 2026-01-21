@@ -77,7 +77,7 @@ export default function AdminDashboard() {
         {
             label: 'Serviços Ativos',
             value: stats ? stats.activeServices : '...',
-            icon: Scissors, // Updated to Scissors (Capitalized)
+            icon: Scissors,
             color: 'text-orange-400',
             bg: 'bg-orange-500/10'
         }
@@ -86,42 +86,42 @@ export default function AdminDashboard() {
     if (loading) return <div className="text-white">Carregando dados...</div>;
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 lg:space-y-8">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
                 {cards.map((card, i) => (
-                    <div key={i} className="glass-dark p-6 rounded-2xl border border-white/5">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${card.bg} ${card.color}`}>
-                                <card.icon size={24} />
+                    <div key={i} className="glass-dark p-4 lg:p-6 rounded-xl lg:rounded-2xl border border-white/5">
+                        <div className="flex justify-between items-start mb-2 lg:mb-4">
+                            <div className={`p-2 lg:p-3 rounded-lg lg:rounded-xl ${card.bg} ${card.color}`}>
+                                <card.icon size={18} className="lg:w-6 lg:h-6" />
                             </div>
-                            <span className="text-xs text-burgos-text bg-white/5 px-2 py-1 rounded-full">
+                            <span className="text-[10px] lg:text-xs text-burgos-text bg-white/5 px-1.5 lg:px-2 py-0.5 lg:py-1 rounded-full">
                                 Hoje
                             </span>
                         </div>
-                        <p className="text-burgos-accent text-sm font-medium">{card.label}</p>
-                        <h3 className="text-3xl font-bold text-white mt-1">{card.value}</h3>
+                        <p className="text-burgos-accent text-xs lg:text-sm font-medium truncate">{card.label}</p>
+                        <h3 className="text-lg lg:text-3xl font-bold text-white mt-0.5 lg:mt-1 truncate">{card.value}</h3>
                     </div>
                 ))}
             </div>
 
             {/* Recent Activity Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 glass-dark rounded-2xl p-6 border border-white/5">
-                    <h3 className="text-xl font-bold text-white mb-6">Atividade Recente</h3>
-                    <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
+                <div className="lg:col-span-2 glass-dark rounded-xl lg:rounded-2xl p-4 lg:p-6 border border-white/5">
+                    <h3 className="text-lg lg:text-xl font-bold text-white mb-4 lg:mb-6">Atividade Recente</h3>
+                    <div className="space-y-3 lg:space-y-4">
                         {[1, 2, 3].map((_, i) => (
-                            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-10 w-10 rounded-full bg-burgos-primary/20 flex items-center justify-center text-burgos-primary font-bold">
+                            <div key={i} className="flex items-center justify-between p-3 lg:p-4 bg-white/5 rounded-lg lg:rounded-xl border border-white/5">
+                                <div className="flex items-center gap-3 lg:gap-4 min-w-0">
+                                    <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full bg-burgos-primary/20 flex items-center justify-center text-burgos-primary font-bold text-sm lg:text-base flex-shrink-0">
                                         C
                                     </div>
-                                    <div>
-                                        <h4 className="text-white font-medium">João Silva</h4>
-                                        <p className="text-sm text-burgos-text">Corte Clássico • 14:00</p>
+                                    <div className="min-w-0">
+                                        <h4 className="text-white font-medium text-sm lg:text-base truncate">João Silva</h4>
+                                        <p className="text-xs lg:text-sm text-burgos-text truncate">Corte Clássico • 14:00</p>
                                     </div>
                                 </div>
-                                <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
+                                <span className="px-2 lg:px-3 py-0.5 lg:py-1 rounded-full bg-green-500/10 text-green-400 text-[10px] lg:text-xs font-bold border border-green-500/20 flex-shrink-0 ml-2">
                                     Confirmado
                                 </span>
                             </div>
@@ -129,18 +129,18 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="glass-dark rounded-2xl p-6 border border-white/5">
-                    <h3 className="text-xl font-bold text-white mb-6">Atalhos</h3>
-                    <div className="space-y-3">
+                <div className="glass-dark rounded-xl lg:rounded-2xl p-4 lg:p-6 border border-white/5">
+                    <h3 className="text-lg lg:text-xl font-bold text-white mb-4 lg:mb-6">Atalhos</h3>
+                    <div className="space-y-2 lg:space-y-3">
                         <button
                             onClick={() => window.location.href = '/agendamento'}
-                            className="w-full py-3 px-4 bg-burgos-primary hover:bg-burgos-light text-burgos-dark font-bold rounded-xl transition-all"
+                            className="w-full py-2.5 lg:py-3 px-4 bg-burgos-primary hover:bg-burgos-light text-burgos-dark font-bold rounded-lg lg:rounded-xl transition-all text-sm lg:text-base"
                         >
                             + Novo Agendamento
                         </button>
                         <button
                             onClick={() => alert('Em breve: Envio de avisos em massa via WhatsApp')}
-                            className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-all border border-white/10"
+                            className="w-full py-2.5 lg:py-3 px-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-lg lg:rounded-xl transition-all border border-white/10 text-sm lg:text-base"
                         >
                             📢 Enviar Aviso
                         </button>

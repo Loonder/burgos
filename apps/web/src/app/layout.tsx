@@ -20,6 +20,10 @@ export const metadata: Metadata = {
         shortcut: '/favicon.ico',
         apple: '/icon.png',
     },
+    robots: {
+        index: false,
+        follow: false,
+    },
 }
 
 const inter = Inter({

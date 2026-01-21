@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 
 export function LandingHeader() {
     const { user, logout } = useAuth();
@@ -54,9 +54,18 @@ export function LandingHeader() {
                 {/* Auth/Action Buttons */}
                 <div className="hidden md:flex items-center gap-4">
                     {user ? (
-                        <div className="flex items-center gap-4 bg-white/5 p-1 pr-4 pl-2 rounded-full border border-white/10">
-                            <span className="text-white text-xs pl-2">Olá, <span className="text-burgos-primary font-bold">{user.name.split(' ')[0]}</span></span>
-                            <Link href="/meus-agendamentos" className="text-xs hover:text-white text-white/70">Painel</Link>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 bg-white/5 p-1 pr-4 pl-2 rounded-full border border-white/10">
+                                <span className="text-white text-xs pl-2">Olá, <span className="text-burgos-primary font-bold">{user.name.split(' ')[0]}</span></span>
+                                <Link href="/meus-agendamentos" className="text-xs hover:text-white text-white/70">Painel</Link>
+                            </div>
+                            <button
+                                onClick={logout}
+                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Sair da conta"
+                            >
+                                <LogOut size={18} />
+                            </button>
                         </div>
                     ) : (
                         <div className="flex items-center gap-3">
@@ -90,7 +99,15 @@ export function LandingHeader() {
                         <div className="h-px w-24 bg-white/10 my-8"></div>
 
                         {user ? (
-                            <Link href="/meus-agendamentos" className="text-xl text-burgos-primary font-bold">Meu Painel</Link>
+                            <>
+                                <Link href="/meus-agendamentos" className="text-xl text-burgos-primary font-bold">Meu Painel</Link>
+                                <button
+                                    onClick={() => { logout(); setMobileMenuOpen(false); }}
+                                    className="text-xl text-red-400 flex items-center gap-2"
+                                >
+                                    <LogOut size={20} /> Sair
+                                </button>
+                            </>
                         ) : (
                             <>
                                 <Link href="/auth/login" className="text-xl text-white">Entrar</Link>

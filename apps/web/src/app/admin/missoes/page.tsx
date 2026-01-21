@@ -42,7 +42,7 @@ export default function AdminMissionsPage() {
     const fetchMissions = async () => {
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/missions`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                credentials: 'include' // Use cookies instead of localStorage
             });
             const data = await res.json();
             setMissions(data.data || []);
@@ -59,9 +59,9 @@ export default function AdminMissionsPage() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/missions`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    'Content-Type': 'application/json'
                 },
+                credentials: 'include', // Use cookies instead of localStorage
                 body: JSON.stringify(formData)
             });
 

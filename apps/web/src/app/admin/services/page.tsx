@@ -59,24 +59,25 @@ export default function ServicesPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                    <Scissors className="text-burgos-primary" />
+        <div className="space-y-4 lg:space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <h1 className="text-lg lg:text-2xl font-bold text-white flex items-center gap-2 lg:gap-3">
+                    <Scissors className="text-burgos-primary w-5 h-5 lg:w-6 lg:h-6" />
                     Gerenciar Serviços
                 </h1>
                 <button
                     onClick={() => setIsFormOpen(true)}
-                    className="flex items-center gap-2 bg-burgos-primary hover:bg-burgos-light text-burgos-dark px-4 py-2 rounded-xl font-bold transition-all"
+                    className="flex items-center gap-2 bg-burgos-primary hover:bg-burgos-light text-burgos-dark px-3 lg:px-4 py-2 rounded-lg lg:rounded-xl font-bold transition-all text-sm lg:text-base"
                 >
-                    <Plus size={20} />
-                    Novo Serviço
+                    <Plus size={18} className="lg:w-5 lg:h-5" />
+                    <span className="hidden sm:inline">Novo Serviço</span>
+                    <span className="sm:hidden">Adicionar</span>
                 </button>
             </div>
 
             {/* Creation Form (Inline for MVP) */}
             {isFormOpen && (
-                <div className="glass-dark p-6 rounded-2xl border border-white/10 animate-fade-in-down">
+                <div className="glass-dark p-4 lg:p-6 rounded-xl lg:rounded-2xl border border-white/10 animate-fade-in-down">
                     <h3 className="text-white font-bold mb-4">Novo Serviço</h3>
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input
@@ -119,9 +120,9 @@ export default function ServicesPage() {
             )}
 
             {/* Services List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                 {services.map((service) => (
-                    <div key={service.id} className="glass-dark p-6 rounded-2xl border border-white/5 hover:border-burgos-primary/30 transition-all group">
+                    <div key={service.id} className="glass-dark p-4 lg:p-6 rounded-xl lg:rounded-2xl border border-white/5 hover:border-burgos-primary/30 transition-all group">
                         <div className="flex justify-between items-start mb-4">
                             <div className="h-12 w-12 rounded-xl bg-burgos-primary/10 flex items-center justify-center text-burgos-primary">
                                 <Scissors size={24} />

@@ -30,7 +30,8 @@ export const createAppointment = async (req: Request, res: Response) => {
 
         // Primary Service ID (for legacy compatibility in appointments table)
         const primaryServiceId = serviceIds[0];
-        const scheduledAt = new Date(`${date}T${time}:00`);
+        // STRICT BRT (-03:00)
+        const scheduledAt = new Date(`${date}T${time}:00-03:00`);
         let clientId = req.user?.id;
 
         // Allow Admin/Barber to book for others
@@ -106,6 +107,47 @@ export const createAppointment = async (req: Request, res: Response) => {
             });
         }
 
+        // CRITICAL: Check for time slot conflicts BEFORE creating appointment
+        const appointmentEndTime = new Date(scheduledAt.getTime() + totalDuration * 60000);
+
+        // Widen search range to include adjacent days (handle timezone spillover)
+        const searchStart = new Date(scheduledAt);
+        searchStart.setDate(searchStart.getDate() - 1);
+        const searchEnd = new Date(scheduledAt);
+        searchEnd.setDate(searchEnd.getDate() + 2);
+
+        const { data: existingAppointments, error: conflictError } = await supabase
+            .from('appointments')
+            .select('id, scheduled_at, duration_minutes')
+            .eq('barber_id', barberId)
+            .gte('scheduled_at', searchStart.toISOString())
+            .lte('scheduled_at', searchEnd.toISOString())
+            .neq('status', 'cancelado');
+
+        if (conflictError) {
+            logger.error('Error checking for conflicts', conflictError);
+            throw conflictError;
+        }
+
+        // Check overlap with existing appointments
+        const hasConflict = existingAppointments?.some(existing => {
+            const existingStart = new Date(existing.scheduled_at).getTime();
+            const existingEnd = existingStart + existing.duration_minutes * 60000;
+            const newStart = scheduledAt.getTime();
+            const newEnd = appointmentEndTime.getTime();
+
+            // Overlap: (StartA < EndB) && (EndA > StartB)
+            return (newStart < existingEnd) && (newEnd > existingStart);
+        });
+
+        if (hasConflict) {
+            logger.warn('Time slot conflict detected', { barberId, scheduledAt, existingAppointments });
+            return res.status(409).json({
+                error: 'Horário já está ocupado. Por favor, escolha outro horário.',
+                code: 'SLOT_CONFLICT'
+            });
+        }
+
         // 1. Create Appointment
         const { data: appointment, error } = await supabase
             .from('appointments')
@@ -123,6 +165,13 @@ export const createAppointment = async (req: Request, res: Response) => {
 
         if (error) {
             logger.error('Supabase error creating appointment', error);
+            // Handle unique constraint violation (backup check)
+            if (error.code === '23505' || error.message?.includes('unique constraint')) {
+                return res.status(409).json({
+                    error: 'Horário já está ocupado. Por favor, escolha outro horário.',
+                    code: 'SLOT_CONFLICT'
+                });
+            }
             throw error;
         }
 
@@ -204,12 +253,19 @@ export const getAppointments = async (req: Request, res: Response) => {
             .order('scheduled_at', { ascending: true });
 
         // Force filter for non-privileged users
-        if (userRole !== 'admin' && userRole !== 'barbeiro') {
+        if (userRole !== 'admin' && userRole !== 'barbeiro' && userRole !== 'recepcionista') {
             // Regular clients can ONLY see their own appointments
             query = query.eq('client_id', userId);
         } else {
-            // Admins/Barbers can filter by params
+            // Admins/Barbers/Receptionists can filter by params
             if (clientId) query = query.eq('client_id', clientId);
+
+            // SPECIAL: If Barber logs in and doesn't specify a barberId, show THEIR own schedule by default
+            // This prevents them from seeing "All" or "Nothing" depending on frontend quirk,
+            // and ensures "My Agenda" feeling.
+            if (userRole === 'barbeiro' && !barberId) {
+                query = query.eq('barber_id', userId);
+            }
         }
 
         if (date) query = query.eq('scheduled_at::date', date);

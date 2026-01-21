@@ -125,14 +125,16 @@ export default function AdminSubscribersPage() {
     );
 
     return (
-        <div className="p-8 pb-32">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-white">Gestão de Assinantes</h1>
+        <div className="px-4 lg:p-8 pb-32">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 lg:mb-8">
+                <h1 className="text-xl lg:text-3xl font-bold text-white">Gestão de Assinantes</h1>
                 <button
                     onClick={openCreateModal}
-                    className="bg-burgos-primary text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-opacity-90"
+                    className="bg-burgos-primary text-white px-3 lg:px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-opacity-90 text-sm lg:text-base"
                 >
-                    <Plus size={20} /> Nova Assinatura
+                    <Plus size={18} className="lg:w-5 lg:h-5" />
+                    <span className="hidden sm:inline">Nova Assinatura</span>
+                    <span className="sm:hidden">Adicionar</span>
                 </button>
             </div>
 
@@ -225,7 +227,8 @@ export default function AdminSubscribersPage() {
                 </div>
             )}
 
-            <div className="bg-burgos-secondary/20 rounded-xl overflow-hidden border border-light-navy-100/10">
+            {/* Desktop Table */}
+            <div className="hidden lg:block bg-burgos-secondary/20 rounded-xl overflow-hidden border border-light-navy-100/10">
                 <table className="w-full text-left">
                     <thead className="bg-burgos-secondary/50 text-burgos-accent/70 uppercase text-xs font-bold">
                         <tr>
@@ -282,6 +285,49 @@ export default function AdminSubscribersPage() {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="lg:hidden space-y-3">
+                {subscribers.length === 0 ? (
+                    <div className="p-8 text-center text-burgos-accent/50 bg-burgos-secondary/20 rounded-xl">Nenhum assinante encontrado.</div>
+                ) : (
+                    subscribers.map((sub) => (
+                        <div key={sub.id} className="bg-burgos-secondary/20 rounded-xl p-4 border border-white/5">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="min-w-0">
+                                    <p className="font-bold text-white truncate">{sub.user?.name || 'Usuário Removido'}</p>
+                                    <p className="text-xs text-burgos-accent/50 truncate">{sub.user?.email}</p>
+                                </div>
+                                {getStatusBadge(sub.status)}
+                            </div>
+                            <div className="flex items-center justify-between text-sm mb-3">
+                                <span className="text-burgos-accent/70">Plano:</span>
+                                <span className="text-white font-medium">{sub.plan?.name || 'Plano Removido'}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-burgos-accent/50 mb-3">
+                                <span>Desde: {new Date(sub.created_at).toLocaleDateString()}</span>
+                                <span>Renova: {new Date(sub.current_period_end).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+                                <button
+                                    onClick={() => openEditModal(sub)}
+                                    className="p-2 hover:bg-white/10 rounded-lg text-burgos-primary"
+                                    title="Editar"
+                                >
+                                    <Edit size={18} />
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(sub.id)}
+                                    className="p-2 hover:bg-white/10 rounded-lg text-red-400"
+                                    title="Remover"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </div>
     );

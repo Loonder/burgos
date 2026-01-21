@@ -47,7 +47,9 @@ export default function BarberDashboard() {
 
     const fetchStats = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/gamification/barber/${user!.id}/stats`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/gamification/barber/${user!.id}/stats`, {
+                credentials: 'include'
+            });
             const data = await res.json();
             setStats(data.stats);
         } catch (error) {
@@ -57,7 +59,9 @@ export default function BarberDashboard() {
 
     const fetchMissions = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/missions`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/missions`, {
+                credentials: 'include'
+            });
             const data = await res.json();
             setMissions(data.data || []);
         } catch (error) {

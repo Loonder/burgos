@@ -4,8 +4,8 @@
 import { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import axios from 'axios';
-import { Lock, Mail, Loader2 } from 'lucide-react';
-
+import { Lock, Mail, Loader2, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -52,6 +52,13 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-burgos-dark border border-white/10 p-8 rounded-2xl shadow-2xl animate-fade-in-up">
+
+                <Link
+                    href="/"
+                    className="text-burgos-text hover:text-burgos-primary transition-colors flex items-center gap-2 text-sm mb-6"
+                >
+                    <ArrowLeft size={16} /> Voltar ao site
+                </Link>
 
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-display font-bold text-burgos-primary mb-2">Burgos<span className="text-white">Admin</span></h1>

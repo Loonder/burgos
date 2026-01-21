@@ -40,7 +40,9 @@ export default function CheckInPage() {
             // In a real app, we would have a specific endpoint or filter by phone directly in the API
             // For MVP, we fetch today's appointments and find the match client-side
             const today = new Date().toISOString().split('T')[0];
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments?date=${today}`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments?date=${today}`, {
+                credentials: 'include'
+            });
             const data = await res.json();
 
             if (!data.data) throw new Error('Falha ao buscar agendamentos');
@@ -75,7 +77,8 @@ export default function CheckInPage() {
 
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/${foundAppointment.id}/check-in`, {
-                method: 'POST'
+                method: 'POST',
+                credentials: 'include'
             });
 
             if (res.ok) {

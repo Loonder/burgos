@@ -4,16 +4,16 @@ import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
-// Public routes
+// Admin routes FIRST (more specific)
+router.get('/admin', authenticate, authorize('admin'), AdminProductController.listAll);
+router.post('/admin', authenticate, authorize('admin'), AdminProductController.create);
+router.put('/admin/:id', authenticate, authorize('admin'), AdminProductController.update);
+router.delete('/admin/:id', authenticate, authorize('admin'), AdminProductController.delete);
+router.post('/admin/:id/link-service', authenticate, authorize('admin'), AdminProductController.linkToService);
+
+// Public routes (less specific)
 router.get('/', ProductController.listProducts);
 router.get('/:id', ProductController.getProduct);
 
-// Admin routes
-router.use('/admin', authenticate, authorize('admin'));
-router.get('/admin', AdminProductController.listAll);
-router.post('/admin', AdminProductController.create);
-router.put('/admin/:id', AdminProductController.update);
-router.delete('/admin/:id', AdminProductController.delete);
-router.post('/admin/:id/link-service', AdminProductController.linkToService);
-
 export default router;
+

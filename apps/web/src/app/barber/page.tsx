@@ -50,7 +50,9 @@ export default function BarberPage() {
     useEffect(() => {
         const fetchBarbers = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/barbers`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/barbers`, {
+                    credentials: 'include'
+                });
                 const data = await res.json();
                 setBarbersList(data.data || []);
             } catch (error) {
@@ -91,7 +93,10 @@ export default function BarberPage() {
                     query += `&startDate=${start.toISOString().split('T')[0]}&endDate=${end.toISOString().split('T')[0]}`;
                 }
 
-                const res = await fetch(query);
+                const res = await fetch(query, {
+                    credentials: 'include',
+                    cache: 'no-store'
+                });
                 const data = await res.json();
                 setAppointments(data.data || []);
             } catch (error) {
@@ -113,6 +118,7 @@ export default function BarberPage() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/${appointmentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ status: newStatus }),
             });
 
