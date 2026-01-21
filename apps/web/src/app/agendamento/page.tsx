@@ -324,20 +324,20 @@ export default function BookingPage() {
             const end = Date.now() + duration;
 
             const frame = () => {
-                // Barber Pole Colors: Red, White, Blue (and Gold for luxury)
-                const colors = ['#dc2626', '#ffffff', '#2563eb', '#FF9F1C'];
+                // Barber Pole Theme: Red, White, Blue + Gold for celebration
+                const colors = ['#dc2626', '#ffffff', '#2563eb', '#FFD700'];
 
                 confetti({
-                    particleCount: 3,
+                    particleCount: 4,
                     angle: 60,
-                    spread: 55,
+                    spread: 70,
                     origin: { x: 0 },
                     colors: colors
                 });
                 confetti({
-                    particleCount: 3,
+                    particleCount: 4,
                     angle: 120,
-                    spread: 55,
+                    spread: 70,
                     origin: { x: 1 },
                     colors: colors
                 });

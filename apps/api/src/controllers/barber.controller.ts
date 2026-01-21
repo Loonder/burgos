@@ -118,7 +118,14 @@ export class BarberController {
 
                 // Check if overlaps with any appointment
                 const isBlocked = appointments?.some(appt => {
-                    const apptStartMs = new Date(appt.scheduled_at).getTime();
+                    let dateStr = appt.scheduled_at;
+                    // Fix: Supabase/Postgres might return string without Z, which new Date() parses as local (-03:00)
+                    // shifting the time by 3 hours. We MUST treat DB times as UTC.
+                    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
+                        dateStr += 'Z';
+                    }
+
+                    const apptStartMs = new Date(dateStr).getTime();
                     const apptEndMs = apptStartMs + (appt.duration_minutes * 60 * 1000);
                     const apptEndWithBuffer = apptEndMs + BUFFER_MS;
 
