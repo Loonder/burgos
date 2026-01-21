@@ -24,7 +24,7 @@ export default function BarbersPage() {
         email: '',
         phone: '',
         commission_rate: 40,
-        password: 'password123' // Temp default
+        password: '' // Default empty for security
     });
     const [selectedBarberForSchedule, setSelectedBarberForSchedule] = useState<{ id: string, name: string } | null>(null);
 
@@ -53,7 +53,7 @@ export default function BarbersPage() {
             }
             setIsFormOpen(false);
             fetchBarbers();
-            setFormData({ id: '', name: '', email: '', phone: '', commission_rate: 40, password: 'password123' });
+            setFormData({ id: '', name: '', email: '', phone: '', commission_rate: 40, password: '' });
         } catch (error) {
             alert('Error saving barber');
         }
