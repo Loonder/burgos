@@ -25,11 +25,17 @@ router.get('/:id/schedule', BarberController.getSchedule);
  * =========================
  */
 
+import { validate } from '../middleware/validate';
+import { createBarberSchema, updateBarberSchema, updateScheduleSchema } from '../schemas/barber.schema';
+
+// ... (existing code)
+
 // Criar barbeiro
 router.post(
     '/',
     authenticate,
     authorize('admin'),
+    validate(createBarberSchema),
     BarberController.createBarber
 );
 
@@ -38,6 +44,7 @@ router.put(
     '/:id',
     authenticate,
     authorize('admin'),
+    validate(updateBarberSchema),
     BarberController.updateBarber
 );
 
@@ -46,6 +53,7 @@ router.put(
     '/:id/schedule',
     authenticate,
     authorize('admin', 'recepcionista', 'barbeiro'),
+    validate(updateScheduleSchema),
     BarberController.updateSchedule
 );
 

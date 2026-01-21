@@ -3,6 +3,8 @@ import { Inter, Outfit } from 'next/font/google'
 import './globals.css'
 import { SocketProvider } from '../contexts/SocketContext'
 import { AuthProvider } from '../contexts/AuthContext'
+import { Toaster } from 'sonner'
+import { CookieConsent } from '@/components/legal/CookieConsent'
 
 export const metadata: Metadata = {
     title: 'Barbearia Burgos | A Melhor Experiência em Taboão da Serra',
@@ -12,6 +14,11 @@ export const metadata: Metadata = {
         description: 'A última barbearia que você vai precisar conhecer.',
         type: 'website',
         locale: 'pt_BR',
+    },
+    icons: {
+        icon: '/icon.png',
+        shortcut: '/favicon.ico',
+        apple: '/icon.png',
     },
 }
 
@@ -36,6 +43,8 @@ export default function RootLayout({
                 <AuthProvider>
                     <SocketProvider>
                         {children}
+                        <CookieConsent />
+                        <Toaster position="top-center" richColors />
                         <script
                             dangerouslySetInnerHTML={{
                                 __html: `

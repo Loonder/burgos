@@ -2,24 +2,29 @@ import { z } from 'zod';
 
 export const loginSchema = z.object({
     body: z.object({
-        email: z.string().email('Invalid email address'),
-        password: z.string().min(1, 'Password is required'),
+        email: z.string().email('Email inválido'),
+        password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
     }),
 });
 
 export const registerSchema = z.object({
     body: z.object({
-        email: z.string().email('Invalid email address'),
-        password: z.string().min(6, 'Password must be at least 6 characters'),
-        name: z.string().min(2, 'Name must be at least 2 characters'),
+        name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
+        email: z.string().email('Email inválido'),
+        password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
         phone: z.string().optional(),
-        birthDate: z.string().optional(),
-        // role is explicitly excluded here to prevent privilege escalation
     }),
 });
 
-export const refreshTokenSchema = z.object({
-    cookies: z.object({
-        refresh_token: z.string().min(1, 'Refresh token is required'),
+export const forgotPasswordSchema = z.object({
+    body: z.object({
+        email: z.string().email().nonempty('Email é obrigatório'),
+    }),
+});
+
+export const resetPasswordSchema = z.object({
+    body: z.object({
+        token: z.string().nonempty('Token é obrigatório'),
+        password: z.string().min(6, 'Nova senha deve ter no mínimo 6 caracteres'),
     }),
 });

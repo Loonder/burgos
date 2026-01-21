@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 
 interface Appointment {
     id: string;
@@ -19,6 +21,16 @@ interface Appointment {
     service: {
         name: string;
     };
+    appointment_services?: Array<{
+        service_id: string;
+        price: number;
+        service: {
+            id: string;
+            name: string;
+            price: number;
+            duration_minutes: number;
+        };
+    }>;
 }
 
 interface CRMData {
@@ -29,11 +41,19 @@ interface CRMData {
 }
 
 export default function ReceptionPage() {
+    const router = useRouter();
     const { user, isLoading } = useAuth();
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [crmData, setCrmData] = useState<CRMData | null>(null);
     const [showCRM, setShowCRM] = useState(false);
+
+    // STAFF ONLY - Redirect if not authenticated or not staff
+    useEffect(() => {
+        if (!isLoading && (!user || (user.role !== 'admin' && user.role !== 'barbeiro' && user.role !== 'recepcionista'))) {
+            router.push('/auth/login?redirect=/reception');
+        }
+    }, [user, isLoading, router]);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -43,8 +63,7 @@ export default function ReceptionPage() {
     const fetchAppointments = async () => {
         try {
             const today = new Date().toISOString().split('T')[0];
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments?date=${today}`);
-            const data = await res.json();
+            const { data } = await api.get(`/api/appointments?date=${today}`);
             setAppointments(data.data || []);
         } catch (error) {
             console.error('Error fetching reception data', error);
@@ -53,17 +72,7 @@ export default function ReceptionPage() {
 
     const fetchCRM = async () => {
         try {
-            // Access token logic might be needed if endpoint is protected.
-            // Assuming useAuth/Axios interceptor handles it, or we manually add header if needed.
-            // For now, using fetch directly might fail if auth is strict.
-            // Ideally we use a wrapper like api.get() but keeping it simple.
-            const token = localStorage.getItem('access_token'); // Simplification
-            if (!token) return;
-
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/crm/alerts`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
+            const { data } = await api.get('/api/crm/alerts');
             setCrmData(data);
         } catch (error) {
             console.error('Error fetching CRM data', error);
@@ -77,6 +86,14 @@ export default function ReceptionPage() {
         return () => clearInterval(interval);
     }, []);
 
+    // Helper to get all service names for an appointment
+    const getServiceNames = (appt: Appointment): string => {
+        if (appt.appointment_services && appt.appointment_services.length > 0) {
+            return appt.appointment_services.map(as => as.service.name).join(', ');
+        }
+        return appt.service.name;
+    };
+
     // Filter for active view
     const upcoming = appointments.filter(a => a.status === 'agendado').sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
     const inService = appointments.filter(a => a.status === 'em_atendimento');
@@ -87,6 +104,20 @@ export default function ReceptionPage() {
         const fullPhone = cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
         window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`, '_blank');
     };
+
+    // Show loading or redirect during auth check
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-burgos-dark flex items-center justify-center">
+                <div className="text-white text-2xl">Carregando...</div>
+            </div>
+        );
+    }
+
+    // Don't render if not staff (redirect will happen)
+    if (!user || (user.role !== 'admin' && user.role !== 'barbeiro' && user.role !== 'recepcionista')) {
+        return null;
+    }
 
     return (
         <div className="min-h-screen bg-burgos-dark text-white overflow-hidden flex font-sans">
@@ -240,7 +271,7 @@ export default function ReceptionPage() {
                                             <div className="text-burgos-primary flex items-center gap-2">
                                                 <span>com {appt.barber.name}</span>
                                                 <span className="w-1 h-1 bg-white/50 rounded-full"></span>
-                                                <span>{appt.service.name}</span>
+                                                <span>{getServiceNames(appt)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -294,8 +325,8 @@ export default function ReceptionPage() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-xs text-burgos-accent font-bold uppercase tracking-widest mb-1">Serviço</div>
-                                                <div className="text-xl font-bold text-white">{appt.service.name}</div>
+                                                <div className="text-xs text-burgos-accent font-bold uppercase tracking-widest mb-1">Serviço{appt.appointment_services && appt.appointment_services.length > 1 ? 's' : ''}</div>
+                                                <div className="text-xl font-bold text-white">{getServiceNames(appt)}</div>
                                             </div>
                                         </div>
                                     </div>

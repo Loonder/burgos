@@ -1,12 +1,23 @@
 import { useState } from 'react';
+import { BarberCardSkeleton } from '@/components/skeletons/BarberCardSkeleton';
 
 interface BarberSelectProps {
     selectedBarber: string | null;
     onSelect: (id: string) => void;
     barbers: any[];
+    isLoading?: boolean;
 }
 
-export function BarberSelect({ selectedBarber, onSelect, barbers = [] }: BarberSelectProps) {
+export function BarberSelect({ selectedBarber, onSelect, barbers = [], isLoading = false }: BarberSelectProps) {
+    if (isLoading) {
+        return (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 animate-fade-in">
+                <BarberCardSkeleton />
+                <BarberCardSkeleton />
+                <BarberCardSkeleton />
+            </div>
+        );
+    }
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 animate-fade-in">
             {barbers.map((barber) => {

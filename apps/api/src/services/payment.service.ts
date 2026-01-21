@@ -80,7 +80,17 @@ class PaymentService {
     async getActiveSubscription(userId: string) {
         const { data, error } = await supabase
             .from('user_subscriptions')
-            .select('*, plan:plans(*)')
+            .select(`
+                *,
+                plan:plans (
+                    *,
+                    discounts:plan_discounts (
+                        service_id,
+                        is_free,
+                        discount_percentage
+                    )
+                )
+            `)
             .eq('user_id', userId)
             .in('status', ['active', 'trialing'])
             .single();

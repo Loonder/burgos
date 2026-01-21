@@ -21,6 +21,7 @@ import paymentRoutes from './routes/payment.routes';
 import crmRoutes from './routes/crm.routes';
 import subscriptionRoutes from './routes/subscription.routes';
 import adminPlanRoutes from './routes/admin-plan.routes';
+import adminSubscriptionRoutes from './routes/admin-subscription.routes';
 import productRoutes from './routes/product.routes';
 import financialRoutes from './routes/financial.routes';
 import exportRoutes from './routes/export.routes';
@@ -42,6 +43,7 @@ const allowedOrigins = [
     'http://localhost:3002',
     'http://localhost:3003',
     'http://localhost:3004',
+    'http://localhost:3030',
 ];
 
 /**
@@ -105,6 +107,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/crm', crmRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin/plans', adminPlanRoutes);
+app.use('/api/admin/subscriptions', adminSubscriptionRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/financial', financialRoutes);
 app.use('/api/export', exportRoutes);
@@ -118,6 +121,9 @@ app.get('/api', (req, res) => {
         status: 'running',
     });
 });
+
+import { errorHandler } from './middleware/errorHandler';
+app.use(errorHandler);
 
 /**
  * 🔁 WEBSOCKET

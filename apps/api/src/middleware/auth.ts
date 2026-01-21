@@ -3,9 +3,14 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 if (!JWT_SECRET) {
     throw new Error('❌ FATAL: JWT_SECRET environment variable is not defined.');
+}
+
+if (!JWT_REFRESH_SECRET) {
+    throw new Error('❌ FATAL: JWT_REFRESH_SECRET environment variable is not defined.');
 }
 
 export interface AuthUser {
@@ -70,9 +75,9 @@ export const generateToken = (user: AuthUser): string => {
 };
 
 export const generateRefreshToken = (user: AuthUser): string => {
-    const refreshSecret = process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret';
+    // Already validated above
     const options: jwt.SignOptions = {
         expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any,
     };
-    return jwt.sign(user, refreshSecret, options);
+    return jwt.sign(user, JWT_REFRESH_SECRET!, options);
 };

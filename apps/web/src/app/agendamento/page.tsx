@@ -1,8 +1,7 @@
 'use client';
 
 import { ClientSelect } from '@/components/booking/ClientSelect';
-import { subscriptionAPI } from '@/lib/api';
-
+import { api, subscriptionAPI } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,6 +12,8 @@ import { PreferenceSelection } from '@/components/booking/PreferenceSelection';
 import { BookingSuccess } from '@/components/booking/BookingSuccess';
 import { ServiceCard } from '@/components/booking/ServiceCard';
 import { ProductSelection } from '@/components/booking/ProductSelection';
+import { ServiceCardSkeleton } from '@/components/skeletons/ServiceCardSkeleton';
+import { toast } from 'sonner';
 
 
 
@@ -47,6 +48,7 @@ export default function BookingPage() {
     const [loadingServices, setLoadingServices] = useState(true);
     const [availableSlots, setAvailableSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
+    const [loadingBarbers, setLoadingBarbers] = useState(true);
 
     // Client Selection (Staff Only)
     const [clients, setClients] = useState<any[]>([]);
@@ -54,36 +56,35 @@ export default function BookingPage() {
     const [loadingClients, setLoadingClients] = useState(false);
 
     // Selection states
-    const [selectedService, setSelectedService] = useState<string | null>(null);
+    const [selectedServices, setSelectedServices] = useState<string[]>([]);
     const [selectedBarber, setSelectedBarber] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
     const [productsPrice, setProductsPrice] = useState(0);
 
-    // Subscription Discount State
-    const [discountInfo, setDiscountInfo] = useState<{ finalPrice: number, isDiscounted: boolean }>({ finalPrice: 0, isDiscounted: false });
+    // Subscription discounts map: service_id -> { is_free, discount_percentage }
+    const [subscriptionDiscounts, setSubscriptionDiscounts] = useState<Map<string, { is_free: boolean, discount_percentage: number }>>(new Map());
+    const [hasSubscription, setHasSubscription] = useState(false);
 
-    useEffect(() => {
-        const checkDiscount = async () => {
-            if (!selectedService || !user) return;
-            const service = services.find(s => s.id === selectedService);
-            if (!service) return;
-
-            try {
-                const result = await subscriptionAPI.checkPrice(selectedService, service.price);
-                if (result.isDiscounted) {
-                    setDiscountInfo(result);
-                    // Use Sonner toast or similar for feedback?
+    // Helper to calculate total price of selected services
+    const getServicesTotal = () => {
+        let total = 0;
+        selectedServices.forEach(id => {
+            const service = services.find(s => s.id === id);
+            if (service) {
+                const discount = subscriptionDiscounts.get(id);
+                if (discount?.is_free) {
+                    // 0
+                } else if (discount?.discount_percentage) {
+                    total += service.price * (1 - discount.discount_percentage / 100);
                 } else {
-                    setDiscountInfo({ finalPrice: service.price, isDiscounted: false });
+                    total += service.price;
                 }
-            } catch (error) {
-                console.error('Error checking price', error);
             }
-        };
-        checkDiscount();
-    }, [selectedService, services, user]);
+        });
+        return total;
+    };
 
     // State Persistence
     useEffect(() => {
@@ -92,7 +93,9 @@ export default function BookingPage() {
         if (savedState) {
             const parsed = JSON.parse(savedState);
             // Verify expiry (optional) or just restore
-            setSelectedService(parsed.service);
+            if (parsed.services) setSelectedServices(parsed.services);
+            else if (parsed.service) setSelectedServices([parsed.service]); // Legacy support
+
             setSelectedBarber(parsed.barber);
             if (parsed.date) setSelectedDate(new Date(parsed.date));
             setSelectedTime(parsed.time);
@@ -126,12 +129,46 @@ export default function BookingPage() {
                 setBarbers(data.data || []);
             } catch (error) {
                 console.error('Failed to load barbers', error);
+            } finally {
+                setLoadingBarbers(false);
             }
         };
 
         fetchServices();
         fetchBarbers();
     }, []);
+
+    // Fetch Subscription Discounts
+    useEffect(() => {
+        const fetchSubscription = async () => {
+            if (!user) {
+                setSubscriptionDiscounts(new Map());
+                setHasSubscription(false);
+                return;
+            }
+            try {
+                const result = await subscriptionAPI.getMySubscription();
+                if (result.subscription && result.subscription.plan) {
+                    setHasSubscription(true);
+                    // Build discount map from plan.discounts
+                    const discounts = result.subscription.plan.discounts || [];
+                    const discountMap = new Map<string, { is_free: boolean, discount_percentage: number }>();
+                    discounts.forEach((d: any) => {
+                        discountMap.set(d.service_id, { is_free: d.is_free, discount_percentage: d.discount_percentage || 0 });
+                    });
+                    setSubscriptionDiscounts(discountMap);
+                } else {
+                    setSubscriptionDiscounts(new Map());
+                    setHasSubscription(false);
+                }
+            } catch (error) {
+                console.error('Error fetching subscription', error);
+                setSubscriptionDiscounts(new Map());
+                setHasSubscription(false);
+            }
+        };
+        fetchSubscription();
+    }, [user]);
 
 
     const isStaff = user?.role === 'admin' || user?.role === 'barbeiro';
@@ -157,17 +194,53 @@ export default function BookingPage() {
         fetchClients();
     }, [isStaff]);
 
+    // Helper to get selected services details with discount applied
+    const getSelectedServicesDetails = () => {
+        return selectedServices.map(id => {
+            const service = services.find(s => s.id === id);
+            if (!service) return null;
+
+            const discount = subscriptionDiscounts.get(id);
+            let finalPrice = service.price;
+            let discountLabel = undefined;
+            let originalPrice = undefined;
+
+            if (discount?.is_free) {
+                finalPrice = 0;
+                discountLabel = '100% OFF';
+                originalPrice = `R$ ${service.price.toFixed(2).replace('.', ',')}`;
+            } else if (discount?.discount_percentage) {
+                finalPrice = service.price * (1 - discount.discount_percentage / 100);
+                discountLabel = `${discount.discount_percentage}% OFF`;
+                originalPrice = `R$ ${service.price.toFixed(2).replace('.', ',')}`;
+            }
+
+            return {
+                ...service,
+                title: service.name,
+                duration: `${service.duration_minutes} min`,
+                discountLabel,
+                originalPrice,
+                price: `R$ ${finalPrice.toFixed(2).replace('.', ',')}`
+            };
+        }).filter((s): s is NonNullable<typeof s> => s !== null);
+    };
+
     // Fetch Slots
     const fetchSlots = async (date: Date) => {
-        if (!selectedBarber || !selectedService) return;
+        if (!selectedBarber || selectedServices.length === 0) return;
 
         setLoadingSlots(true);
         try {
             const dateStr = date.toISOString().split('T')[0];
-            const url = `${process.env.NEXT_PUBLIC_API_URL}/api/barbers/${selectedBarber}/available-slots?date=${dateStr}&serviceId=${selectedService}`;
+            const url = `${process.env.NEXT_PUBLIC_API_URL}/api/barbers/${selectedBarber}/available-slots`;
 
-            const res = await fetch(url);
-            const data = await res.json();
+            const { data } = await api.get(url, {
+                params: {
+                    date: dateStr,
+                    serviceIds: selectedServices.join(',')
+                }
+            });
             setAvailableSlots(data.slots || []);
         } catch (error) {
             console.error('Error fetching slots:', error);
@@ -179,10 +252,10 @@ export default function BookingPage() {
 
     // Initial slot fetch when entering step 3
     useEffect(() => {
-        if (step === 3 && selectedBarber && selectedService) {
+        if (step === 3 && selectedBarber && selectedServices.length > 0) {
             fetchSlots(selectedDate || new Date());
         }
-    }, [step, selectedBarber, selectedService]);
+    }, [step, selectedBarber, selectedServices]);
 
     const handleBack = () => {
         setStep((prev) => Math.max(1, prev - 1));
@@ -200,7 +273,7 @@ export default function BookingPage() {
             // Save state to safely restore after login
             const stateToSave = {
                 step: 5, // Return to summary/confirm step (New Step 5)
-                service: selectedService,
+                services: selectedServices,
                 barber: selectedBarber,
                 date: selectedDate,
                 time: selectedTime,
@@ -219,7 +292,7 @@ export default function BookingPage() {
     const handleFinalize = async (preferences: any) => {
         try {
             const appointmentData = {
-                serviceId: selectedService,
+                serviceIds: selectedServices,
                 barberId: selectedBarber,
                 date: selectedDate?.toISOString().split('T')[0],
                 time: selectedTime,
@@ -229,30 +302,26 @@ export default function BookingPage() {
                 clientId: (isStaff && selectedClient) ? selectedClient : undefined,
             };
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${user?.id ? localStorage.getItem('access_token') : ''}`
-                },
-                body: JSON.stringify(appointmentData),
-            });
+            const response = await api.post('/api/appointments', appointmentData);
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Falha ao criar agendamento');
-            }
+            // Success is implied if no error thrown
+            // const data = response.data; // if needed
+
+
+
+            // ...
 
             // Success: Move to Success View
             setStep(7); // Success is now Step 7
             localStorage.removeItem('booking_state'); // Clear any preserved state
+            toast.success('Agendamento realizado com sucesso!');
         } catch (error: any) {
             console.error('Error booking:', error);
-            alert(`Erro ao realizar agendamento: ${error.message}`);
+            toast.error(error.message || 'Erro ao realizar agendamento');
         }
     };
 
-    const getServiceDetails = () => services.find(s => s.id === selectedService);
+
     const getBarberDetails = () => barbers.find(b => b.id === selectedBarber);
 
     const TOTAL_STEPS = 7; // Increased by 1
@@ -345,29 +414,57 @@ export default function BookingPage() {
 
                         <div className="grid md:grid-cols-2 gap-6">
                             {loadingServices ? (
-                                <div className="col-span-2 text-center py-8 text-burgos-accent">Carregando serviços...</div>
+                                <>
+                                    <ServiceCardSkeleton />
+                                    <ServiceCardSkeleton />
+                                    <ServiceCardSkeleton />
+                                    <ServiceCardSkeleton />
+                                </>
                             ) : (
-                                services.map((service) => (
-                                    <ServiceCard
-                                        key={service.id}
-                                        title={service.name}
-                                        price={`R$ ${service.price.toFixed(2).replace('.', ',')}`}
-                                        duration={`${service.duration_minutes} min`}
-                                        selected={selectedService === service.id}
-                                        onClick={() => setSelectedService(service.id)}
-                                        image={service.image}
-                                    />
-                                ))
+                                services.map((service) => {
+                                    const discount = subscriptionDiscounts.get(service.id);
+                                    const isFree = discount?.is_free || false;
+                                    const discountPct = discount?.discount_percentage || 0;
+                                    const discountedPrice = isFree ? 0 : service.price * (1 - discountPct / 100);
+
+                                    return (
+                                        <ServiceCard
+                                            key={service.id}
+                                            title={service.name}
+                                            price={`R$ ${service.price.toFixed(2).replace('.', ',')}`}
+                                            duration={`${service.duration_minutes} min`}
+                                            selected={selectedServices.includes(service.id)}
+                                            onClick={() => {
+                                                if (selectedServices.includes(service.id)) {
+                                                    setSelectedServices(prev => prev.filter(id => id !== service.id));
+                                                } else {
+                                                    setSelectedServices(prev => [...prev, service.id]);
+                                                }
+                                            }}
+                                            image={service.image}
+                                            // Discount props
+                                            isFree={isFree}
+                                            originalPrice={`R$ ${service.price.toFixed(2).replace('.', ',')}`}
+                                            discountedPrice={discountPct > 0 ? `R$ ${discountedPrice.toFixed(2).replace('.', ',')}` : undefined}
+                                            discountLabel={discountPct > 0 && !isFree ? `${discountPct}% OFF` : undefined}
+                                        />
+                                    );
+                                })
                             )}
                         </div>
 
-                        <div className="mt-12 flex justify-center">
+                        <div className="mt-12 flex justify-center flex-col items-center gap-4">
+                            {selectedServices.length > 0 && (
+                                <div className="text-white text-lg">
+                                    {selectedServices.length} serviço(s) selecionado(s) • Total: R$ {getServicesTotal().toFixed(2).replace('.', ',')}
+                                </div>
+                            )}
                             <button
-                                onClick={() => selectedService && setStep(2)}
-                                disabled={!selectedService}
+                                onClick={() => selectedServices.length > 0 && setStep(2)}
+                                disabled={selectedServices.length === 0}
                                 className={`
                                 px-12 py-4 rounded-full font-bold text-lg uppercase tracking-wider transition-all duration-300
-                                ${selectedService
+                                ${selectedServices.length > 0
                                         ? 'bg-burgos-primary text-white hover:shadow-[0_0_20px_rgba(255,159,28,0.4)] hover:-translate-y-1'
                                         : 'bg-burgos-secondary text-white/20 cursor-not-allowed'
                                     }
@@ -393,6 +490,7 @@ export default function BookingPage() {
                             selectedBarber={selectedBarber}
                             onSelect={setSelectedBarber}
                             barbers={barbers}
+                            isLoading={loadingBarbers}
                         />
 
                         <div className="mt-12 flex justify-center">
@@ -453,7 +551,9 @@ export default function BookingPage() {
                 {/* Step 4: Product Selection */}
                 {step === 4 && (
                     <ProductSelection
-                        serviceId={selectedService}
+                        // ServiceId is optional or unused logic inside ProductSelection for now
+                        // If it uses it to filter, we might need to update it to accept array or Primary Service
+                        serviceId={selectedServices[0]}
                         selectedProducts={selectedProducts}
                         onToggleProduct={(id, price) => {
                             if (selectedProducts.includes(id)) {
@@ -477,24 +577,11 @@ export default function BookingPage() {
                 {step === 5 && (
                     <div className="animate-fade-in max-w-4xl mx-auto">
                         <BookingSummary
-                            service={getServiceDetails() ? {
-                                title: getServiceDetails()!.name,
-                                // Logic: If discounted, show weird format or pass raw values?
-                                // BookingSummary expects a string price. Let's format it.
-                                price: discountInfo.isDiscounted
-                                    ? `R$ ${discountInfo.finalPrice.toFixed(2).replace('.', ',')}`
-                                    : `R$ ${getServiceDetails()!.price.toFixed(2).replace('.', ',')}`,
-                                duration: `${getServiceDetails()!.duration_minutes} min`,
-                                image: getServiceDetails()!.image
-                            } : undefined}
+                            services={getSelectedServicesDetails()}
                             barber={getBarberDetails()}
                             date={selectedDate}
                             time={selectedTime}
                             onConfirm={handleConfirm}
-                            // Pass discount metadata can be helpful if we update BookingSummary component
-                            discountLabel={discountInfo.isDiscounted ? (discountInfo.finalPrice === 0 ? 'Assinatura VIP (Grátis)' : `Desconto Assinante`) : undefined}
-                            originalPrice={discountInfo.isDiscounted ? `R$ ${getServiceDetails()!.price.toFixed(2)}` : undefined}
-                            // Add product info to summary if we updated BookingSummary props (we didn't yet, but let's pass it anyway or update it next)
                             productsPrice={productsPrice}
                             productsCount={selectedProducts.length}
                         />
@@ -518,7 +605,7 @@ export default function BookingPage() {
                             date={selectedDate}
                             time={selectedTime}
                             barberName={getBarberDetails()?.name}
-                            serviceName={getServiceDetails()?.name}
+                            serviceName={selectedServices.map(id => services.find(s => s.id === id)?.name).join(', ')}
                         />
                     </div>
                 )}

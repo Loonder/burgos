@@ -35,7 +35,7 @@ export class DashboardController {
 
             const stats = {
                 appointmentsToday: parseInt(dailyAppointments.rows[0].count),
-                revenueToday: parseFloat(dailyAppointments.rows[0].revenue || '0'),
+                revenueToday: parseFloat(totalRevenue.rows[0]?.revenue || '0'),
                 activeBarbers: parseInt(activeBarbers.rows[0].count),
                 activeServices: parseInt(servicesCount.rows[0].count),
                 lastUpdated: new Date().toISOString()

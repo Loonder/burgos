@@ -1,17 +1,29 @@
+interface ServiceSummary {
+    title: string;
+    price: string;
+    duration: string;
+    image?: string;
+    discountLabel?: string;
+    originalPrice?: string;
+}
+
 interface BookingSummaryProps {
-    service: { title: string; price: string; duration: string; image?: string } | undefined;
+    services: ServiceSummary[];
     barber: { name: string; avatar?: string; avatar_url?: string } | undefined;
     date: Date | null;
     time: string | null;
     onConfirm: () => void;
-    discountLabel?: string;
-    originalPrice?: string;
     productsPrice?: number;
     productsCount?: number;
 }
 
-export function BookingSummary({ service, barber, date, time, onConfirm, discountLabel, originalPrice, productsPrice, productsCount }: BookingSummaryProps) {
-    if (!service || !barber || !date || !time) return null;
+export function BookingSummary({ services, barber, date, time, onConfirm, productsPrice, productsCount }: BookingSummaryProps) {
+    if (!services || services.length === 0 || !barber || !date || !time) return null;
+
+    // Calculate totals for display
+    // Price strings are formatted "R$ XX,XX", so we might need raw numbers if we want to sum here, 
+    // OR we assume the parent calculated everything. 
+    // Let's just list them.
 
     return (
         <div className="max-w-xl mx-auto animate-fade-in space-y-8">
@@ -31,36 +43,39 @@ export function BookingSummary({ service, barber, date, time, onConfirm, discoun
                         </div>
                     </div>
 
-                    {/* Service Info */}
-                    <div className="flex items-center justify-between pb-6 border-b border-white/5">
-                        <div className="flex items-center gap-4">
-                            {service.image && (
-                                <img
-                                    src={service.image}
-                                    alt={service.title}
-                                    className="w-16 h-16 rounded-lg border border-white/10 object-cover"
-                                />
-                            )}
-                            <div>
-                                <p className="text-sm text-burgos-accent/60">Serviço</p>
-                                <h3 className="text-lg font-bold text-white">{service.title}</h3>
-                                <p className="text-sm text-burgos-primary">{service.duration}</p>
+                    {/* Services Info */}
+                    <div className="pb-6 border-b border-white/5 space-y-4">
+                        <p className="text-sm text-burgos-accent/60 uppercase tracking-widest text-xs font-bold">Serviços Selecionados</p>
+                        {services.map((service, index) => (
+                            <div key={index} className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    {service.image && (
+                                        <img
+                                            src={service.image}
+                                            alt={service.title}
+                                            className="w-12 h-12 rounded-lg border border-white/10 object-cover"
+                                        />
+                                    )}
+                                    <div>
+                                        <h3 className="text-md font-bold text-white">{service.title}</h3>
+                                        <p className="text-xs text-burgos-primary">{service.duration}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="flex flex-col items-end">
+                                        {service.originalPrice && (
+                                            <span className="text-xs text-red-400 line-through mr-1">{service.originalPrice}</span>
+                                        )}
+                                        <span className="text-lg font-bold text-white">{service.price}</span>
+                                        {service.discountLabel && (
+                                            <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full">
+                                                {service.discountLabel}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm text-burgos-accent/60">Valor</p>
-                            <div className="flex flex-col items-end">
-                                {originalPrice && (
-                                    <span className="text-sm text-red-400 line-through mr-1">{originalPrice}</span>
-                                )}
-                                <span className="text-2xl font-bold text-white">{service.price}</span>
-                                {discountLabel && (
-                                    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full mt-1">
-                                        {discountLabel}
-                                    </span>
-                                )}
-                            </div>
-                        </div>
+                        ))}
                     </div>
 
                     {/* Date Info */}

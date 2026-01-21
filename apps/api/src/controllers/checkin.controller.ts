@@ -10,6 +10,7 @@ export class CheckinController {
     static async checkin(req: Request, res: Response) {
         // Assume request body contains appointment_id
         const { appointmentId } = req.body;
+        logger.info(`Checkin request received for Appointment: ${appointmentId}`);
 
         if (!appointmentId) {
             return res.status(400).json({ error: 'Appointment ID required' });

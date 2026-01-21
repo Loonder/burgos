@@ -131,26 +131,81 @@ export default function AdminPlansPage() {
                             </div>
 
                             <div>
-                                <label className="block text-burgos-accent/70 mb-2 font-bold mt-4">Serviços Inclusos (100% OFF)</label>
-                                <div className="grid grid-cols-2 gap-2">
+                                <label className="block text-burgos-accent/70 mb-2 font-bold mt-4">Configurar Descontos por Serviço</label>
+                                <div className="space-y-2 max-h-64 overflow-y-auto">
                                     {services.map(service => {
-                                        const isSelected = currentPlan.discounts?.some((d: any) => d.service_id === service.id);
+                                        const discount = currentPlan.discounts?.find((d: any) => d.service_id === service.id);
+                                        const isFree = discount?.is_free || false;
+                                        const percentage = discount?.discount_percentage || 0;
+
                                         return (
                                             <div
                                                 key={service.id}
-                                                onClick={() => toggleDiscount(service.id)}
-                                                className={`p-3 rounded-lg border cursor-pointer transition-colors flex items-center justify-between ${isSelected
-                                                        ? 'bg-burgos-primary/20 border-burgos-primary'
-                                                        : 'bg-burgos-dark border-white/5 hover:border-white/20'
-                                                    }`}
+                                                className="p-3 rounded-lg border bg-burgos-dark border-white/10 flex items-center justify-between gap-3"
                                             >
-                                                <span className="text-white text-sm">{service.name}</span>
-                                                {isSelected && <CheckCircleIcon />}
+                                                <span className="text-white text-sm flex-1">{service.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                    {/* FREE Toggle */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const discounts = [...(currentPlan.discounts || [])];
+                                                            const index = discounts.findIndex((d: any) => d.service_id === service.id);
+                                                            if (isFree) {
+                                                                // Remove
+                                                                if (index >= 0) discounts.splice(index, 1);
+                                                            } else {
+                                                                // Add as free
+                                                                if (index >= 0) {
+                                                                    discounts[index] = { ...discounts[index], is_free: true, discount_percentage: 0 };
+                                                                } else {
+                                                                    discounts.push({ service_id: service.id, is_free: true, discount_percentage: 0 });
+                                                                }
+                                                            }
+                                                            setCurrentPlan({ ...currentPlan, discounts });
+                                                        }}
+                                                        className={`px-3 py-1 text-xs font-bold rounded-full transition-colors ${isFree
+                                                                ? 'bg-green-500 text-white'
+                                                                : 'bg-white/10 text-white/50 hover:bg-white/20'
+                                                            }`}
+                                                    >
+                                                        🥷 GRÁTIS
+                                                    </button>
+
+                                                    {/* Percentage Input */}
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={isFree ? '' : percentage}
+                                                            disabled={isFree}
+                                                            onChange={(e) => {
+                                                                const pct = Number(e.target.value);
+                                                                const discounts = [...(currentPlan.discounts || [])];
+                                                                const index = discounts.findIndex((d: any) => d.service_id === service.id);
+                                                                if (pct > 0) {
+                                                                    if (index >= 0) {
+                                                                        discounts[index] = { ...discounts[index], is_free: false, discount_percentage: pct };
+                                                                    } else {
+                                                                        discounts.push({ service_id: service.id, is_free: false, discount_percentage: pct });
+                                                                    }
+                                                                } else {
+                                                                    if (index >= 0) discounts.splice(index, 1);
+                                                                }
+                                                                setCurrentPlan({ ...currentPlan, discounts });
+                                                            }}
+                                                            placeholder="0"
+                                                            className="w-14 bg-black/50 border border-white/10 rounded px-2 py-1 text-white text-center text-sm disabled:opacity-30"
+                                                        />
+                                                        <span className="text-white/50 text-sm">%</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <p className="text-xs text-burgos-accent/50 mt-2">Atualmente o sistema suporta apenas "Livre (100% OFF)" via Admin Simplificado.</p>
+                                <p className="text-xs text-burgos-accent/50 mt-2">Selecione "GRÁTIS" para 100% off ou defina uma % de desconto.</p>
                             </div>
                         </div>
 

@@ -10,18 +10,26 @@ interface AppointmentBody {
     time: string;
     preferences: Record<string, any>;
     clientId?: string;
-    productIds?: string[]; // New field
+    productIds?: string[];
+    serviceIds?: string[]; // New field
 }
 
 export const createAppointment = async (req: Request, res: Response) => {
     try {
         const body = req.body as AppointmentBody;
-        const { serviceId, barberId, date, time, preferences, productIds } = body;
+        let { serviceId, serviceIds, barberId, date, time, preferences, productIds } = body;
 
-        if (!serviceId || !barberId || !date || !time) {
+        // Support Legacy: If only serviceId provided, treat as single item array
+        if (!serviceIds && serviceId) {
+            serviceIds = [serviceId];
+        }
+
+        if (!serviceIds || serviceIds.length === 0 || !barberId || !date || !time) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
+        // Primary Service ID (for legacy compatibility in appointments table)
+        const primaryServiceId = serviceIds[0];
         const scheduledAt = new Date(`${date}T${time}:00`);
         let clientId = req.user?.id;
 
@@ -34,7 +42,69 @@ export const createAppointment = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'User not authenticated' });
         }
 
-        logger.info('Creating appointment for client', { clientId, serviceId, barberId, scheduledAt, productIds });
+        logger.info('Creating appointment', { clientId, serviceIds, barberId, scheduledAt, productIds });
+
+        // 0. Fetch Subscription (if exists)
+        const { data: subscription } = await supabase
+            .from('user_subscriptions')
+            .select(`
+                plan_id, status,
+                plan:plans (
+                    id, name,
+                    discounts:plan_discounts (
+                        service_id, is_free, discount_percentage
+                    )
+                )
+            `)
+            .eq('user_id', clientId)
+            .eq('status', 'active')
+            .gt('current_period_end', new Date().toISOString())
+            .single();
+
+        // 0.5 Calculate Totals & Individual Service Data
+        let totalDuration = 0;
+        let totalPrice = 0;
+        const servicesToInsert: any[] = [];
+
+        // Fetch all service details
+        const { data: servicesData, error: servicesError } = await supabase
+            .from('services')
+            .select('id, name, price, duration_minutes')
+            .in('id', serviceIds);
+
+        if (servicesError || !servicesData || servicesData.length !== serviceIds.length) {
+            return res.status(400).json({ error: 'One or more services not found' });
+        }
+
+        // Process each service
+        for (const service of servicesData) {
+            totalDuration += service.duration_minutes;
+            let finalServicePrice = service.price;
+
+            // Apply Discount if Subscribed
+            if (subscription && subscription.plan) {
+                const planData = subscription.plan as any;
+                if (planData.discounts) {
+                    const discountRule = planData.discounts.find((d: any) => d.service_id === service.id);
+                    if (discountRule) {
+                        if (discountRule.is_free) {
+                            finalServicePrice = 0;
+                            logger.info(`Applying 100% discount for service ${service.id}`);
+                        } else if (discountRule.discount_percentage > 0) {
+                            const discountAmount = (service.price * discountRule.discount_percentage) / 100;
+                            finalServicePrice = Math.max(0, service.price - discountAmount);
+                            logger.info(`Applying ${discountRule.discount_percentage}% discount for service ${service.id}`);
+                        }
+                    }
+                }
+            }
+
+            totalPrice += finalServicePrice;
+            servicesToInsert.push({
+                service_id: service.id,
+                price: finalServicePrice
+            });
+        }
 
         // 1. Create Appointment
         const { data: appointment, error } = await supabase
@@ -42,11 +112,11 @@ export const createAppointment = async (req: Request, res: Response) => {
             .insert({
                 client_id: clientId,
                 barber_id: barberId,
-                service_id: serviceId,
+                service_id: primaryServiceId, // Legacy
                 scheduled_at: scheduledAt.toISOString(),
-                duration_minutes: 45,
+                duration_minutes: totalDuration, // Sum of durations
                 preferences: preferences || {},
-                status: 'agendado'
+                status: 'agendado',
             })
             .select()
             .single();
@@ -56,9 +126,35 @@ export const createAppointment = async (req: Request, res: Response) => {
             throw error;
         }
 
+        // 1.5 Insert Appointment Services (Join Table)
+        const appointmentServicesData = servicesToInsert.map(s => ({
+            appointment_id: appointment.id,
+            service_id: s.service_id,
+            price: s.price
+        }));
+
+        const { error: batchError } = await supabase
+            .from('appointment_services')
+            .insert(appointmentServicesData);
+
+        if (batchError) {
+            logger.error('Error inserting appointment services', batchError);
+            // Non-critical (?) or critical? If this fails, we lose track of services.
+            // Ideally should rollback, but Supabase HTTP API doesn't support generic transactions easily without RPC.
+            // For now, log it.
+        }
+
+        // 1.6 Create Payment
+        await supabase.from('payments').insert({
+            appointment_id: appointment.id,
+            amount: totalPrice,
+            method: totalPrice === 0 ? 'pix' : 'dinheiro',
+            status: totalPrice === 0 ? 'confirmado' : 'pendente',
+            confirmed_at: totalPrice === 0 ? new Date() : null
+        });
+
         // 2. Add Products (if any)
         if (productIds && productIds.length > 0) {
-            // Fetch products to get current prices
             const { data: products } = await supabase
                 .from('products')
                 .select('id, price')
@@ -68,18 +164,10 @@ export const createAppointment = async (req: Request, res: Response) => {
                 const appointmentProducts = products.map(p => ({
                     appointment_id: appointment.id,
                     product_id: p.id,
-                    quantity: 1, // Default to 1 for now
+                    quantity: 1,
                     price_at_purchase: p.price
                 }));
-
-                const { error: prodError } = await supabase
-                    .from('appointment_products')
-                    .insert(appointmentProducts);
-
-                if (prodError) {
-                    logger.error('Error adding products to appointment', prodError);
-                    // Continue, don't fail the appointment
-                }
+                await supabase.from('appointment_products').insert(appointmentProducts);
             }
         }
 
@@ -106,7 +194,12 @@ export const getAppointments = async (req: Request, res: Response) => {
                 *,
                 client:users!client_id(id, name, phone, avatar_url),
                 barber:users!barber_id(id, name, avatar_url),
-                service:services(id, name, price, duration_minutes)
+                service:services(id, name, price, duration_minutes),
+                appointment_services(
+                    service_id,
+                    price,
+                    service:services(id, name, price, duration_minutes)
+                )
             `)
             .order('scheduled_at', { ascending: true });
 

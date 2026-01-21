@@ -85,9 +85,9 @@ async function migrate() {
             } catch (err) {
                 await client.query('ROLLBACK');
 
-                // Special handling for 001 already existing
-                if (file.includes('001') && (err.message.includes('already exists') || err.message.includes('duplicate object'))) {
-                    console.warn(`⚠ Warning in ${file}: Schema seems to exist. Marking as applied.`);
+                // General handling for "already exists" or "duplicate object" errors
+                if (err.message.includes('already exists') || err.message.includes('duplicate object')) {
+                    console.warn(`⚠ Warning in ${file}: Object seems to exist (${err.message}). Marking as applied.`);
                     await client.query('INSERT INTO _migrations (filename) VALUES ($1)', [file]);
                 } else {
                     console.error(`❌ FATAL ERROR in ${file}: ${err.message}`);

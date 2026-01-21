@@ -1,11 +1,19 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/database';
 import { logger } from '../utils/logger';
+import { cacheService } from '../services/cache.service';
 
 export class ServiceController {
     static async getServices(req: Request, res: Response) {
         try {
             const { category } = req.query;
+            const cacheKey = category ? `services:${category}` : 'services';
+
+            const cached = cacheService.get(cacheKey);
+            if (cached) {
+                return res.status(200).json({ data: cached });
+            }
+
             let query = supabase
                 .from('services')
                 .select('*')
@@ -13,6 +21,8 @@ export class ServiceController {
             query = query.eq('is_active', true);
             const { data, error } = await query;
             if (error) throw error;
+
+            cacheService.set(cacheKey, data);
             res.status(200).json({ data });
         } catch (error: any) {
             logger.error('Error fetching services', error);
@@ -29,6 +39,8 @@ export class ServiceController {
                 .select()
                 .single();
             if (error) throw error;
+
+            cacheService.flush(); // Invalidate all service caches
             logger.info(`Service created: ${name}`);
             res.status(201).json({ message: 'Service created', data });
         } catch (error: any) {
@@ -48,6 +60,8 @@ export class ServiceController {
                 .select()
                 .single();
             if (error) throw error;
+
+            cacheService.flush(); // Invalidate
             res.status(200).json({ message: 'Service updated', data });
         } catch (error: any) {
             logger.error('Error updating service', error);
@@ -60,11 +74,13 @@ export class ServiceController {
             const { id } = req.params;
             const { data, error } = await supabase
                 .from('services')
-                .update({ is_active: false })
+                .update({ is_active: false, deleted_at: new Date() })
                 .eq('id', id)
                 .select()
                 .single();
             if (error) throw error;
+
+            cacheService.flush(); // Invalidate
             res.status(200).json({ message: 'Service deleted (archived)', data });
         } catch (error: any) {
             logger.error('Error deleting service', error);

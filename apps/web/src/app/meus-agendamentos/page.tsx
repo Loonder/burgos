@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppointmentCardSkeleton } from '@/components/skeletons/AppointmentCardSkeleton';
+import { toast } from 'sonner';
 
 interface Appointment {
     id: string;
@@ -48,17 +50,27 @@ export default function MyAppointments() {
         fetchAppointments();
     }, [user, isLoading]);
 
+
+
+    // ... 
+
     const handleCancel = async (id: string) => {
+        // Simple confirm for now, better to use a Dialog later
         if (!confirm('Tem certeza que deseja cancelar?')) return;
 
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/${id}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/appointments/${id}`, {
                 method: 'DELETE',
             });
+
+            if (!response.ok) throw new Error('Falha ao cancelar');
+
             // Refresh list
             setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: 'cancelado' } : a));
+            toast.success('Agendamento cancelado com sucesso');
         } catch (error) {
             console.error('Error cancelling', error);
+            toast.error('Erro ao cancelar agendamento');
         }
     };
 
@@ -80,7 +92,11 @@ export default function MyAppointments() {
 
             <div className="container mx-auto px-4 py-8 max-w-2xl">
                 {loading ? (
-                    <div className="text-center py-12 text-burgos-accent">Carregando...</div>
+                    <div className="space-y-4">
+                        <AppointmentCardSkeleton />
+                        <AppointmentCardSkeleton />
+                        <AppointmentCardSkeleton />
+                    </div>
                 ) : appointments.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-burgos-accent mb-6">Você não tem agendamentos.</p>

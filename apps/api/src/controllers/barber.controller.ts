@@ -1,20 +1,21 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcrypt';
 import { supabase } from '../config/database';
 import { logger } from '../utils/logger';
+import { cacheService } from '../services/cache.service';
 
 export class BarberController {
     static async getAvailableSlots(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            const { date, serviceId } = req.query;
+            const { date, serviceId, serviceIds } = req.query;
 
-            if (!date || !serviceId) {
-                return res.status(400).json({ error: 'Missing date or serviceId' });
+            if (!date || (!serviceId && !serviceIds)) {
+                return res.status(400).json({ error: 'Missing date or serviceId(s)' });
             }
 
             const dateStr = date as string;
             const requestedDate = new Date(dateStr);
-            // 0=Sun, 1=Mon, ..., 6=Sat
             const dayOfWeek = requestedDate.getUTCDay();
 
             // 1. Get Schedule
@@ -26,22 +27,26 @@ export class BarberController {
                 .single();
 
             if (scheduleError || !schedule) {
-                // No schedule for this day
                 return res.status(200).json({ slots: [] });
             }
 
-            // 2. Get Service Duration
-            const { data: service, error: serviceError } = await supabase
+            // 2. Get Service Duration(s)
+            let duration = 0;
+            const idsToCheck = serviceIds
+                ? (serviceIds as string).split(',')
+                : [serviceId as string];
+
+            const { data: services, error: serviceError } = await supabase
                 .from('services')
                 .select('duration_minutes')
-                .eq('id', serviceId)
-                .single();
+                .in('id', idsToCheck);
 
-            if (serviceError || !service) {
-                return res.status(400).json({ error: 'Service not found' });
+            if (serviceError || !services || services.length === 0) {
+                return res.status(400).json({ error: 'Services not found' });
             }
 
-            const duration = service.duration_minutes;
+            // Sum duration of all selected services
+            duration = services.reduce((acc, curr) => acc + curr.duration_minutes, 0);
 
             // 3. Get Existing Appointments
             const { data: appointments, error: apptError } = await supabase
@@ -66,10 +71,14 @@ export class BarberController {
 
             // Slot interval (e.g., 30 mins)
             const SLOT_INTERVAL = 30;
+            const APPOINTMENT_BUFFER_MIN = 2; // Buffer after every appointment
 
             for (let current = startTotal; current + duration <= endTotal; current += SLOT_INTERVAL) {
                 const slotStartMin = current;
                 const slotEndMin = current + duration;
+
+                // Effective end for blocking purposes (includes buffer)
+                const slotEndWithBuffer = slotEndMin + APPOINTMENT_BUFFER_MIN;
 
                 // Check if overlaps with any appointment
                 const isBlocked = appointments?.some(appt => {
@@ -77,9 +86,22 @@ export class BarberController {
                     // Adjust to minutes
                     const apptStart = apptDate.getUTCHours() * 60 + apptDate.getUTCMinutes();
                     const apptEnd = apptStart + appt.duration_minutes;
+                    const apptEndWithBuffer = apptEnd + APPOINTMENT_BUFFER_MIN;
 
-                    // Overlap logic: (StartA < EndB) and (EndA > StartB)
-                    return (slotStartMin < apptEnd) && (slotEndMin > apptStart);
+                    // Overlap logic: 
+                    // 1. Candidate Slot overlaps Existing Appointment (considering Existing's buffer)
+                    // 2. Existing Appointment overlaps Candidate Slot (considering Candidate's buffer)
+                    // Formula: (StartA < EndB) && (EndA > StartB)
+
+                    // We check if "Slot (extended)" overlaps "Appt" OR "Slot" overlaps "Appt (extended)"
+                    // Actually simplier: Treat BOTH as having extended duration for the check?
+                    // If A finishes at 10:00 (10:02 buffered), B starts at 10:00. 
+                    // B.Start (10:00) < A.EndBuffer (10:02) -> Overlap! Correct.
+
+                    // If B finishes at 10:00 (10:02 buffered), A starts at 10:00.
+                    // B.EndBuffer (10:02) > A.Start (10:00) -> Overlap! Correct.
+
+                    return (slotStartMin < apptEndWithBuffer) && (slotEndWithBuffer > apptStart);
                 });
 
                 if (!isBlocked) {
@@ -100,13 +122,20 @@ export class BarberController {
     // ADMIN CRUD
     static async listBarbers(req: Request, res: Response) {
         try {
+            const cacheKey = 'barbers';
+            const cached = cacheService.get(cacheKey);
+            if (cached) return res.json({ data: cached });
+
             const { data, error } = await supabase
                 .from('users')
-                .select('*')
+                .select('id, email, name, phone, role, avatar_url, commission_rate, is_active, created_at')
                 .eq('role', 'barbeiro')
+                .eq('is_active', true)
                 .order('name');
 
             if (error) throw error;
+
+            cacheService.set(cacheKey, data);
             res.json({ data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to list barbers' });
@@ -116,14 +145,18 @@ export class BarberController {
     static async createBarber(req: Request, res: Response) {
         try {
             const { email, password, name, phone, commission_rate } = req.body;
-            // In a real app, hash password here or use Auth service
-            // For MVP we just insert. WARNING: Password should be hashed.
+
+            if (!password) {
+                return res.status(400).json({ error: 'Password is required' });
+            }
+
+            const passwordHash = await bcrypt.hash(password, 10);
 
             const { data, error } = await supabase
                 .from('users')
                 .insert({
                     email,
-                    password_hash: '$2b$10$placeholder', // TODO: Hash password
+                    password_hash: passwordHash,
                     name,
                     phone,
                     role: 'barbeiro',
@@ -133,6 +166,8 @@ export class BarberController {
                 .single();
 
             if (error) throw error;
+
+            cacheService.del('barbers');
             res.status(201).json({ message: 'Barber created', data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to create barber' });
@@ -152,6 +187,8 @@ export class BarberController {
                 .single();
 
             if (error) throw error;
+
+            cacheService.del('barbers');
             res.json({ message: 'Barber updated', data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to update barber' });
@@ -163,12 +200,14 @@ export class BarberController {
             const { id } = req.params;
             const { data, error } = await supabase
                 .from('users')
-                .update({ is_active: false })
+                .update({ is_active: false, deleted_at: new Date() })
                 .eq('id', id)
                 .select()
                 .single();
 
             if (error) throw error;
+
+            cacheService.del('barbers');
             res.json({ message: 'Barber deactivated', data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to delete barber' });
@@ -177,6 +216,10 @@ export class BarberController {
     static async getSchedule(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            const cacheKey = `schedule:${id}`;
+            const cached = cacheService.get(cacheKey);
+            if (cached) return res.json({ schedule: cached });
+
             const { data, error } = await supabase
                 .from('barber_schedules')
                 .select('*')
@@ -184,6 +227,8 @@ export class BarberController {
                 .order('day_of_week');
 
             if (error) throw error;
+
+            cacheService.set(cacheKey, data);
             res.json({ schedule: data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to fetch schedule' });
@@ -217,6 +262,7 @@ export class BarberController {
 
             if (error) throw error;
 
+            cacheService.del(`schedule:${id}`);
             res.json({ message: 'Schedule updated', data });
         } catch (error) {
             res.status(500).json({ error: 'Failed to update schedule' });

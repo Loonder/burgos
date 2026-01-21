@@ -144,4 +144,76 @@ export class AdminPlanController {
             res.status(500).json({ error: 'Erro ao listar assinantes' });
         }
     }
+
+    // POST /api/admin/subscriptions
+    static async createSubscription(req: Request, res: Response) {
+        try {
+            const { user_id, plan_id, status, days } = req.body;
+
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + (days || 30));
+
+            const { data, error } = await supabase
+                .from('user_subscriptions')
+                .insert({
+                    user_id,
+                    plan_id,
+                    status: status || 'active',
+                    current_period_start: startDate.toISOString(),
+                    current_period_end: endDate.toISOString()
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            res.status(201).json({ data });
+        } catch (error) {
+            logger.error('Admin Create Subscription Error', error);
+            res.status(500).json({ error: 'Erro ao criar assinatura' });
+        }
+    }
+
+    // PUT /api/admin/subscriptions/:id
+    static async updateSubscription(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { status, plan_id } = req.body;
+
+            const updateData: any = {};
+            if (status) updateData.status = status;
+            if (plan_id) updateData.plan_id = plan_id;
+
+            const { data, error } = await supabase
+                .from('user_subscriptions')
+                .update(updateData)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            res.json({ data });
+        } catch (error) {
+            logger.error('Admin Update Subscription Error', error);
+            res.status(500).json({ error: 'Erro ao atualizar assinatura' });
+        }
+    }
+
+    // DELETE /api/admin/subscriptions/:id
+    static async deleteSubscription(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+
+            const { error } = await supabase
+                .from('user_subscriptions')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            res.status(204).send();
+        } catch (error) {
+            logger.error('Admin Delete Subscription Error', error);
+            res.status(500).json({ error: 'Erro ao remover assinatura' });
+        }
+    }
 }

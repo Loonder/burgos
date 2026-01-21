@@ -5,9 +5,27 @@ interface ServiceCardProps {
     selected: boolean;
     onClick: () => void;
     image?: string | null;
+    // Discount props
+    originalPrice?: string;
+    discountedPrice?: string;
+    isFree?: boolean;
+    discountLabel?: string;
 }
 
-export function ServiceCard({ title, price, duration, selected, onClick, image }: ServiceCardProps) {
+export function ServiceCard({
+    title,
+    price,
+    duration,
+    selected,
+    onClick,
+    image,
+    originalPrice,
+    discountedPrice,
+    isFree,
+    discountLabel
+}: ServiceCardProps) {
+    const hasDiscount = isFree || (originalPrice && discountedPrice && originalPrice !== discountedPrice);
+
     return (
         <div
             onClick={onClick}
@@ -19,6 +37,18 @@ export function ServiceCard({ title, price, duration, selected, onClick, image }
                 }
             `}
         >
+            {/* VIP Badge */}
+            {hasDiscount && (
+                <div className="absolute top-2 right-2 z-20">
+                    <span className={`px-2 py-1 text-xs font-bold uppercase rounded-full ${isFree
+                        ? 'bg-green-500 text-white animate-pulse'
+                        : 'bg-yellow-500 text-black'
+                        }`}>
+                        {isFree ? '🥷 VIP' : discountLabel || 'VIP'}
+                    </span>
+                </div>
+            )}
+
             {image ? (
                 <div className="absolute inset-0 z-0 transition-opacity duration-300">
                     <img src={image} alt={title} className="w-full h-full object-cover opacity-60 group-hover:opacity-80" />
@@ -42,7 +72,20 @@ export function ServiceCard({ title, price, duration, selected, onClick, image }
             </div>
             <div className="relative z-10 flex justify-between items-end">
                 <div>
-                    <span className="block text-2xl font-bold drop-shadow-md">{price}</span>
+                    {/* Price Display */}
+                    {isFree ? (
+                        <>
+                            <span className="block text-sm line-through text-gray-400 drop-shadow-md">{originalPrice || price}</span>
+                            <span className="block text-2xl font-bold text-green-400 drop-shadow-md">R$ 0,00</span>
+                        </>
+                    ) : hasDiscount ? (
+                        <>
+                            <span className="block text-sm line-through text-gray-400 drop-shadow-md">{originalPrice}</span>
+                            <span className="block text-2xl font-bold drop-shadow-md">{discountedPrice}</span>
+                        </>
+                    ) : (
+                        <span className="block text-2xl font-bold drop-shadow-md">{price}</span>
+                    )}
                     <span className={`text-sm ${selected ? 'text-white/80' : 'text-burgos-accent/80'} drop-shadow-md`}>
                         {duration}
                     </span>
@@ -51,3 +94,4 @@ export function ServiceCard({ title, price, duration, selected, onClick, image }
         </div>
     );
 }
+

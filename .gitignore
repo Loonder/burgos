@@ -62,6 +62,16 @@ Thumbs.db
 *.pem
 *.crt
 *.cert
+*.pfx
+*.p12
+secret.js
+secrets.js
+password.txt
+passwords.txt
+*.key
+*.pem
+*.crt
+*.cert
 *.md
 !README.md
 

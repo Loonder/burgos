@@ -1,20 +1,21 @@
 import { Router } from 'express';
 import * as AppointmentController from '../controllers/appointment.controller';
 import { CheckinController } from '../controllers/checkin.controller';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
-// router.use(authenticate); // Protect all routes
-// Actually, I will explicitly add it to each route or uncomment line 8.
-router.use(authenticate); // Protect all routes
+import { validate } from '../middleware/validate';
+import { createAppointmentSchema, updateAppointmentSchema } from '../schemas/appointment.schema';
 
-router.post('/', AppointmentController.createAppointment);
+// All endpoints require authentication
+router.use(authenticate);
+
+router.post('/', validate(createAppointmentSchema), AppointmentController.createAppointment);
 router.get('/', AppointmentController.getAppointments);
 router.get('/:id', AppointmentController.getAppointmentById);
-router.put('/:id', AppointmentController.updateAppointment);
+router.put('/:id', validate(updateAppointmentSchema), AppointmentController.updateAppointment);
 router.delete('/:id', AppointmentController.cancelAppointment);
-// router.post('/:id/check-in', AppointmentController.checkInAppointment);
 router.post('/checkin', CheckinController.checkin);
 
 export default router;
