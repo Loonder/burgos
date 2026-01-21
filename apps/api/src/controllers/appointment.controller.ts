@@ -2,6 +2,15 @@ import { Request, Response } from 'express';
 import { supabase } from '../config/database';
 import { logger } from '../utils/logger';
 import { io } from '../index'; // Import socket instance
+import {
+    localTimeToUTC,
+    parseUTCTimestamp,
+    addMinutesToDate,
+    toUTCString,
+    checkIntervalOverlap,
+    createInterval,
+    getBusinessDayUTCBounds,
+} from '../services/datetime.service';
 
 interface AppointmentBody {
     serviceId: string;
@@ -30,8 +39,20 @@ export const createAppointment = async (req: Request, res: Response) => {
 
         // Primary Service ID (for legacy compatibility in appointments table)
         const primaryServiceId = serviceIds[0];
-        // STRICT BRT (-03:00)
-        const scheduledAt = new Date(`${date}T${time}:00-03:00`);
+
+        // Use DateTimeService for proper timezone conversion
+        const scheduledAt = localTimeToUTC(date, time);
+
+        // VALIDATION: Reject past dates/times
+        const now = new Date();
+        if (scheduledAt < now) {
+            logger.warn('Attempted to book past date/time', { date, time, scheduledAt: toUTCString(scheduledAt), now: now.toISOString() });
+            return res.status(400).json({
+                error: 'Não é possível agendar em datas ou horários que já passaram.',
+                code: 'PAST_DATE'
+            });
+        }
+
         let clientId = req.user?.id;
 
         // Allow Admin/Barber to book for others
@@ -43,7 +64,7 @@ export const createAppointment = async (req: Request, res: Response) => {
             return res.status(401).json({ error: 'User not authenticated' });
         }
 
-        logger.info('Creating appointment', { clientId, serviceIds, barberId, scheduledAt, productIds });
+        logger.info('Creating appointment', { clientId, serviceIds, barberId, scheduledAt: toUTCString(scheduledAt), productIds });
 
         // 0. Fetch Subscription (if exists)
         const { data: subscription } = await supabase
@@ -108,20 +129,21 @@ export const createAppointment = async (req: Request, res: Response) => {
         }
 
         // CRITICAL: Check for time slot conflicts BEFORE creating appointment
-        const appointmentEndTime = new Date(scheduledAt.getTime() + totalDuration * 60000);
+        const appointmentEndTime = addMinutesToDate(scheduledAt, totalDuration);
 
-        // Widen search range to include adjacent days (handle timezone spillover)
-        const searchStart = new Date(scheduledAt);
+        // Use DateTimeService for search range (UTC bounds with buffer)
+        const { start: dayStartUTC, end: dayEndUTC } = getBusinessDayUTCBounds(date);
+        const searchStart = new Date(dayStartUTC);
         searchStart.setDate(searchStart.getDate() - 1);
-        const searchEnd = new Date(scheduledAt);
-        searchEnd.setDate(searchEnd.getDate() + 2);
+        const searchEnd = new Date(dayEndUTC);
+        searchEnd.setDate(searchEnd.getDate() + 1);
 
         const { data: existingAppointments, error: conflictError } = await supabase
             .from('appointments')
             .select('id, scheduled_at, duration_minutes')
             .eq('barber_id', barberId)
-            .gte('scheduled_at', searchStart.toISOString())
-            .lte('scheduled_at', searchEnd.toISOString())
+            .gte('scheduled_at', toUTCString(searchStart))
+            .lte('scheduled_at', toUTCString(searchEnd))
             .neq('status', 'cancelado');
 
         if (conflictError) {
@@ -129,19 +151,18 @@ export const createAppointment = async (req: Request, res: Response) => {
             throw conflictError;
         }
 
-        // Check overlap with existing appointments
+        // Check overlap with existing appointments using DateTimeService
+        const newInterval = createInterval(scheduledAt, appointmentEndTime);
         const hasConflict = existingAppointments?.some(existing => {
-            const existingStart = new Date(existing.scheduled_at).getTime();
-            const existingEnd = existingStart + existing.duration_minutes * 60000;
-            const newStart = scheduledAt.getTime();
-            const newEnd = appointmentEndTime.getTime();
+            const existingStart = parseUTCTimestamp(existing.scheduled_at);
+            const existingEnd = addMinutesToDate(existingStart, existing.duration_minutes);
+            const existingInterval = createInterval(existingStart, existingEnd);
 
-            // Overlap: (StartA < EndB) && (EndA > StartB)
-            return (newStart < existingEnd) && (newEnd > existingStart);
+            return checkIntervalOverlap(newInterval, existingInterval);
         });
 
         if (hasConflict) {
-            logger.warn('Time slot conflict detected', { barberId, scheduledAt, existingAppointments });
+            logger.warn('Time slot conflict detected', { barberId, scheduledAt: toUTCString(scheduledAt), existingAppointments });
             return res.status(409).json({
                 error: 'Horário já está ocupado. Por favor, escolha outro horário.',
                 code: 'SLOT_CONFLICT'
@@ -155,7 +176,7 @@ export const createAppointment = async (req: Request, res: Response) => {
                 client_id: clientId,
                 barber_id: barberId,
                 service_id: primaryServiceId, // Legacy
-                scheduled_at: scheduledAt.toISOString(),
+                scheduled_at: toUTCString(scheduledAt),
                 duration_minutes: totalDuration, // Sum of durations
                 preferences: preferences || {},
                 status: 'agendado',

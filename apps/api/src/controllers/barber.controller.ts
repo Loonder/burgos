@@ -3,6 +3,16 @@ import bcrypt from 'bcrypt';
 import { supabase } from '../config/database';
 import { logger } from '../utils/logger';
 import { cacheService } from '../services/cache.service';
+import {
+    DateTimeService,
+    parseUTCTimestamp,
+    getBusinessDayUTCBounds,
+    generateSlotIntervals,
+    checkIntervalOverlap,
+    createInterval,
+    addMinutesToDate,
+    toUTCString,
+} from '../services/datetime.service';
 
 export class BarberController {
     static async getAvailableSlots(req: Request, res: Response) {
@@ -16,11 +26,15 @@ export class BarberController {
             }
 
             const dateStr = date as string;
-            const requestedDate = new Date(dateStr);
-            if (isNaN(requestedDate.getTime())) {
-                return res.status(400).json({ error: 'Invalid date format' });
+
+            // Validate date format (YYYY-MM-DD)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
             }
-            const dayOfWeek = requestedDate.getUTCDay();
+
+            // Get day of week from business date (using UTC bounds start)
+            const { start: dayStartUTC, end: dayEndUTC } = getBusinessDayUTCBounds(dateStr);
+            const dayOfWeek = dayStartUTC.getUTCDay();
 
             // 1. Get Schedule
             const { data: schedule, error: scheduleError } = await supabase
@@ -36,11 +50,10 @@ export class BarberController {
             }
 
             // 2. Get Service Duration(s)
-            let duration = 0;
             let idsToCheck: string[] = [];
 
             if (serviceIds) {
-                const sIds = serviceIds as string; // Handle potential array if needed? Usually string in Express query
+                const sIds = serviceIds as string;
                 idsToCheck = sIds.includes(',') ? sIds.split(',') : [sIds];
             } else if (serviceId) {
                 idsToCheck = [serviceId as string];
@@ -48,7 +61,7 @@ export class BarberController {
 
             const { data: services, error: serviceError } = await supabase
                 .from('services')
-                .select('id, duration_minutes') // Select ID too for verification
+                .select('id, duration_minutes')
                 .in('id', idsToCheck);
 
             if (serviceError || !services || services.length === 0) {
@@ -61,98 +74,77 @@ export class BarberController {
                 const foundIds = services.map(s => s.id);
                 const missingIds = idsToCheck.filter(id => !foundIds.includes(id));
                 logger.warn(`Some services not found: ${missingIds.join(', ')}`);
-                // Proceed with found ones? Or error? Strict mode: Error.
                 return res.status(400).json({ error: `Some services not found: ${missingIds.join(', ')}` });
             }
 
             // Sum duration of all selected services
-            duration = services.reduce((acc, curr) => acc + curr.duration_minutes, 0);
+            const totalDuration = services.reduce((acc, curr) => acc + curr.duration_minutes, 0);
 
             // 3. Get Existing Appointments
-            // Widen range to handle timezone boundaries safely (Yesterday/Today/Tomorrow relative to UTC)
-            // requestedDate is UTC Midnight of the requested day
-            const searchStart = new Date(requestedDate);
-            searchStart.setDate(searchStart.getDate() - 1); // Look back 1 day
-            const searchEnd = new Date(requestedDate);
-            searchEnd.setDate(searchEnd.getDate() + 2); // Look forward 2 days (total 3 days coverage)
+            // Use UTC bounds for the business day, with buffer for edge cases
+            const searchStart = new Date(dayStartUTC);
+            searchStart.setDate(searchStart.getDate() - 1);
+            const searchEnd = new Date(dayEndUTC);
+            searchEnd.setDate(searchEnd.getDate() + 1);
 
-            // Simplification: Just take the whole window around the date to be safe
             const { data: appointments, error: apptError } = await supabase
                 .from('appointments')
                 .select('scheduled_at, duration_minutes')
                 .eq('barber_id', id)
-                .gte('scheduled_at', searchStart.toISOString())
-                .lte('scheduled_at', searchEnd.toISOString())
+                .gte('scheduled_at', toUTCString(searchStart))
+                .lte('scheduled_at', toUTCString(searchEnd))
                 .neq('status', 'cancelado');
 
             if (apptError) throw apptError;
 
-            logger.info(`Fetching slots for ${dateStr}. Found ${appointments?.length} appointments.`);
+            logger.info(`Fetching slots for ${dateStr}. Found ${appointments?.length || 0} appointments in range.`);
 
-            // 4. Generate All Slots
-            const slots: string[] = [];
+            // 4. Generate All Potential Slots using DateTimeService
+            const potentialSlots = generateSlotIntervals(
+                dateStr,
+                schedule.start_time,
+                schedule.end_time,
+                totalDuration
+            );
 
-            // Parse start/end times (HH:MM:SS)
-            const [startH, startM] = schedule.start_time.split(':').map(Number);
-            const [endH, endM] = schedule.end_time.split(':').map(Number);
+            // 5. Filter out slots that overlap with existing appointments OR are in the past
+            const availableSlots: string[] = [];
+            const now = new Date();
 
-            // Convert everything to minutes from midnight for easier calculation
-            const startTotal = startH * 60 + startM;
-            const endTotal = endH * 60 + endM;
+            for (const slot of potentialSlots) {
+                // Skip past slots
+                if (slot.startUTC <= now) {
+                    continue;
+                }
 
-            // Slot interval (e.g., 30 mins)
-            const SLOT_INTERVAL = 30;
-            const APPOINTMENT_BUFFER_MIN = 0; // Buffer REMOVED to prevent overlap
-            const BUFFER_MS = APPOINTMENT_BUFFER_MIN * 60 * 1000;
+                const slotInterval = createInterval(slot.startUTC, slot.endUTC);
 
-            // Base Date for Slots (Strict BRT -03:00)
-            const baseDateInfo = new Date(`${dateStr}T00:00:00-03:00`);
-            const baseEpoch = baseDateInfo.getTime();
-
-            for (let current = startTotal; current + duration <= endTotal; current += SLOT_INTERVAL) {
-                // Calculated Slot Times in Epoch (Absolute Time)
-                // current is minutes from midnight BRT
-                const slotStartMs = baseEpoch + (current * 60 * 1000);
-                const slotEndMs = slotStartMs + (duration * 60 * 1000);
-                const slotEndWithBuffer = slotEndMs + BUFFER_MS;
-
-                // Check if overlaps with any appointment
                 const isBlocked = appointments?.some(appt => {
-                    let dateStr = appt.scheduled_at;
-                    // Fix: Supabase/Postgres might return string without Z, which new Date() parses as local (-03:00)
-                    // shifting the time by 3 hours. We MUST treat DB times as UTC.
-                    if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
-                        dateStr += 'Z';
-                    }
+                    // Parse using DateTimeService (handles missing 'Z' centrally)
+                    const apptStartUTC = parseUTCTimestamp(appt.scheduled_at);
+                    const apptEndUTC = addMinutesToDate(apptStartUTC, appt.duration_minutes);
+                    const apptInterval = createInterval(apptStartUTC, apptEndUTC);
 
-                    const apptStartMs = new Date(dateStr).getTime();
-                    const apptEndMs = apptStartMs + (appt.duration_minutes * 60 * 1000);
-                    const apptEndWithBuffer = apptEndMs + BUFFER_MS;
-
-                    // Overlap: (StartA < EndB) && (EndA > StartB)
-                    return (slotStartMs < apptEndWithBuffer) && (slotEndWithBuffer > apptStartMs);
+                    return checkIntervalOverlap(slotInterval, apptInterval);
                 });
 
                 if (!isBlocked) {
-                    // Convert back to HH:MM
-                    const h = Math.floor(current / 60).toString().padStart(2, '0');
-                    const m = (current % 60).toString().padStart(2, '0');
-                    slots.push(`${h}:${m}`);
+                    availableSlots.push(slot.localTime);
                 }
             }
 
             logger.info(`Available slots for barber ${id} on ${dateStr}:`, {
-                totalSlots: slots.length,
+                totalPotentialSlots: potentialSlots.length,
+                availableSlots: availableSlots.length,
                 existingAppointments: appointments?.length || 0,
                 appointmentsDetail: appointments?.map(a => ({
                     scheduled_at: a.scheduled_at,
-                    localTime: new Date(a.scheduled_at).toLocaleTimeString('pt-BR'),
                     duration: a.duration_minutes
                 })),
-                slotsReturned: slots.slice(0, 5) // First 5 slots for debug
+                slotsReturned: availableSlots.slice(0, 5)
             });
 
-            res.status(200).json({ slots });
+            res.status(200).json({ slots: availableSlots });
         } catch (error: any) {
             logger.error('Error fetching slots', error);
             res.status(500).json({ error: error.message || 'Internal server error' });

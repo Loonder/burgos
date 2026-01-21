@@ -314,19 +314,27 @@ export default function BarberPage() {
                                     </div>
                                 ) : (
                                     appointments.map((appt) => (
-                                        <div key={appt.id} className="glass-dark border border-white/5 p-6 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
-                                            <div className="flex items-center gap-4 flex-1">
+                                        <div key={appt.id} className="glass-dark border border-white/5 p-6 rounded-2xl flex flex-col md:flex-row gap-4 items-start justify-between">
+                                            <div className="flex items-start gap-4 flex-1">
                                                 <div className="text-center min-w-[80px]">
                                                     <div className="text-2xl font-bold text-white">{new Date(appt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
                                                     <div className="text-xs text-burgos-accent uppercase">{showAllBarbers ? (appt.barber?.name || 'Barbeiro') : 'Horário'}</div>
                                                 </div>
                                                 <div className="h-10 w-px bg-white/10 mx-2"></div>
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="text-lg font-bold text-white">{appt.client?.name}</div>
                                                     <div className="text-sm text-burgos-primary">{appt.service?.name}</div>
+                                                    {/* Client Preferences */}
+                                                    {appt.preferences && (appt.preferences.drink || appt.preferences.music || appt.preferences.notes) && (
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {appt.preferences.drink && <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-1 rounded">🥤 {appt.preferences.drink}</span>}
+                                                            {appt.preferences.music && <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded">🎵 {appt.preferences.music}</span>}
+                                                            {appt.preferences.notes && <span className="text-xs bg-white/10 text-white/70 px-2 py-1 rounded">📝 {appt.preferences.notes}</span>}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 self-center">
                                                 {appt.status === 'agendado' && (
                                                     <button onClick={() => updateStatus(appt.id, 'em_atendimento')} className="px-4 py-2 bg-burgos-primary text-burgos-dark font-bold rounded-lg hover:bg-white transition-colors">Iniciar</button>
                                                 )}

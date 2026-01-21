@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import Link from 'next/link';
 
 interface Appointment {
     id: string;
@@ -31,6 +32,11 @@ interface Appointment {
             duration_minutes: number;
         };
     }>;
+    preferences?: {
+        drink?: string;
+        music?: string;
+        notes?: string;
+    };
 }
 
 interface CRMData {
@@ -227,6 +233,12 @@ export default function ReceptionPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-8">
+                        <Link
+                            href="/agendamento"
+                            className="bg-burgos-primary hover:bg-burgos-primary/90 text-white font-bold py-3 px-6 rounded-full text-sm uppercase tracking-wider shadow-lg shadow-burgos-primary/20 transition-all hover:scale-105 flex items-center gap-2"
+                        >
+                            <span>+</span> Novo Agendamento
+                        </Link>
                         <button
                             onClick={() => { fetchCRM(); setShowCRM(!showCRM); }}
                             className="bg-burgos-primary/10 hover:bg-burgos-primary/20 text-burgos-primary border border-burgos-primary/50 px-6 py-3 rounded-full font-bold uppercase text-xs tracking-widest transition-all"
@@ -261,18 +273,34 @@ export default function ReceptionPage() {
                                 </div>
                             ) : (
                                 upcoming.map(appt => (
-                                    <div key={appt.id} className="bg-glass-dark border border-white/5 p-6 rounded-2xl flex items-center gap-4 relative overflow-hidden group">
+                                    <div key={appt.id} className="bg-glass-dark border border-white/5 p-6 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
                                         <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500/50"></div>
-                                        <div className="text-3xl font-bold font-mono text-white min-w-[90px]">
-                                            {new Date(appt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-2xl font-bold truncate">{appt.client.name}</div>
-                                            <div className="text-burgos-primary flex items-center gap-2">
-                                                <span>com {appt.barber.name}</span>
-                                                <span className="w-1 h-1 bg-white/50 rounded-full"></span>
-                                                <span>{getServiceNames(appt)}</span>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-3xl font-bold font-mono text-white min-w-[90px]">
+                                                {new Date(appt.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                             </div>
+                                            <div className="flex-1">
+                                                <div className="text-2xl font-bold truncate">{appt.client.name}</div>
+                                                <div className="text-burgos-primary flex items-center gap-2">
+                                                    <span>com {appt.barber.name}</span>
+                                                    <span className="w-1 h-1 bg-white/50 rounded-full"></span>
+                                                    <span>{getServiceNames(appt)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* Phone & Preferences */}
+                                        <div className="pl-[106px] space-y-1">
+                                            <div className="text-sm text-white/60 flex items-center gap-2">
+                                                <span>📞</span>
+                                                <span>{appt.client.phone || 'Sem telefone'}</span>
+                                            </div>
+                                            {appt.preferences && (appt.preferences.drink || appt.preferences.music || appt.preferences.notes) && (
+                                                <div className="flex flex-wrap gap-3 text-xs text-burgos-accent/80">
+                                                    {appt.preferences.drink && <span className="bg-white/5 px-2 py-1 rounded">🥤 {appt.preferences.drink}</span>}
+                                                    {appt.preferences.music && <span className="bg-white/5 px-2 py-1 rounded">🎵 {appt.preferences.music}</span>}
+                                                    {appt.preferences.notes && <span className="bg-white/5 px-2 py-1 rounded">📝 {appt.preferences.notes}</span>}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))
